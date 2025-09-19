@@ -1,0 +1,14 @@
+Article I found for ML forcasting applied to stock market: https://www.mdpi.com/2673-9909/5/3/76
+Advantages to ML algorithm:
+  - Eliminates human Biases
+  - Traditional tracking methods often struggle to deal with complication and non-linear patterns that come with financial data
+  - It is difficult to use manual approaches for real time analysis and response to dynamic market changes
+ This Paper discusses 4 different approaches to analysis of the stock market, 2 traditional stock market forcasting techniques, 2 ML techniques,and 5 DL techniques, it also discussess usefull datasets and evaluation methods as well as some open issue swith implementation.
+
+APPROACHES:
+  - Fundemental Analysis
+      1. Seeks to determine a company intrinsic value via factors at the economic, industry specific, and company levels.
+      2. Three main components. Macroeconomics, 
+
+ 
+
