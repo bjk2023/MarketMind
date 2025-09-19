@@ -1,128 +1,76 @@
-# Contributor Covenant Code of Conduct
+# [Your Project] Code of Conduct
 
-## Our Pledge
+In the interest of fostering an open and welcoming environment, [your project] pledges to be an inclusive and harassment-free experience for all, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, educational background, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
-We as members, contributors, and leaders pledge to make participation in our
-community a harassment-free experience for everyone, regardless of age, body
-size, visible or invisible disability, ethnicity, sex characteristics, gender
-identity and expression, level of experience, education, socio-economic status,
-nationality, personal appearance, race, religion, or sexual identity
-and orientation.
+This Code of Conduct applies to all [your project]-affiliated activity online and offline.
 
-We pledge to act and interact in ways that contribute to an open, welcoming,
-diverse, inclusive, and healthy community.
+## Summary
 
-## Our Standards
+- [Be respectful and inclusive](#be-respectful-and-inclusive).
+- [Give and be welcoming to constructive feedback](#give-and-be-welcoming-to-constructive-feedback).
+- [Focus on what is best for the [Your Project] community](#focus-on-what-is-best-for-the-community).
+- Do not engage in any [unacceptable behaviors](#unacceptable-behaviors).
+- At any point, you may [report CoC violations](#reporting-incidents) to our Coordinators and Faculty Advisors.
+- [Project maintainers](#project-maintainer-responsibilities) should be mindful of the Code of Conduct.
+- Summarize any [project-specific guidelines](#[your-project]-specific-guidelines) (if any) here.
 
-Examples of behavior that contributes to a positive environment for our
-community include:
+## Guidelines
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
-  and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the
-  overall community
+### Be respectful and inclusive
 
-Examples of unacceptable behavior include:
+- **Use inclusive language.** This includes:
+  - using [gender-neutral or non-gendered language](http://geekfeminism.wikia.com/wiki/Nonsexist_language) where possible
+  - When referring to community members, using their [correct pronouns](https://www.brynmawr.edu/sites/default/files/asking-for-name-and-pronouns.pdf)
+  - in general, avoiding any language that could be considered offensive towards marginalized groups
+- **Respect people's differences.** Examples include:
+  - Being welcoming towards new members
+  - Being open to opposing viewpoints
+  - Being understanding of cultural differences
+  - Making sure your project and any physical spaces your project team may meet are accessible to all members, including members with disabilities
 
-* The use of sexualized language or imagery, and sexual attention or
-  advances of any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email
-  address, without their explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
-  professional setting
+### Give and be welcoming to constructive feedback
 
-## Enforcement Responsibilities
+- **Be constructive and respectful** when giving others feedback. This includes:
+  - Keeping all feedback constructive, objective and impersonal
+- **Be accepting of constructive criticism**. If you feel that any critiques are overly harsh, excessive, or harassing, contact a project lead ASAP.
 
-Community leaders are responsible for clarifying and enforcing our standards of
-acceptable behavior and will take appropriate and fair corrective action in
-response to any behavior that they deem inappropriate, threatening, offensive,
-or harmful.
+### Focus on what is best for the community
 
-Community leaders have the right and responsibility to remove, edit, or reject
-comments, commits, code, wiki edits, issues, and other contributions that are
-not aligned to this Code of Conduct, and will communicate reasons for moderation
-decisions when appropriate.
+- **Show empathy towards other community members.** Examples include:
+  - Actively listening to other team members
+  - "Stepping back" and allowing others to participate when you feel that you are dominating a conversation
+  - Respecting other people's boundaries and privacy
+- **Acknowledge and learn from mistakes**. This includes:
+  - Working to eliminate unconscious bias
+  - Being aware of how your actions affect others
+  - Correcting any harmful behavior going forward
 
-## Scope
+## Unacceptable Behaviors
 
-This Code of Conduct applies within all community spaces, and also applies when
-an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official e-mail address,
-posting via an official social media account, or acting as an appointed
-representative at an online or offline event.
+Examples of unacceptable behaviors include:
 
-## Enforcement
+- The use of sexualized language or imagery and unwelcome sexual attention or advances
+- Trolling, insulting/derogatory comments, and personal or political attacks
+- Public or private harassment as defined [here](https://rcos.github.io/rcos-handbook/#/community/harassment_guidelines)
+- Publishing others’ private information, such as a physical or electronic address, without explicit permission
+- Other conduct which could reasonably be considered inappropriate in a professional setting
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-.
-All complaints will be reviewed and investigated promptly and fairly.
+## Reporting Incidents
 
-All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+This project is affiliated with [Rensselaer Center for Open Source](http://rcos.io) (RCOS). At any point, you may report instances of CoC violations to the RCOS [Coordinators](https://rcos.github.io/rcos-handbook/#/leadership/coordinators) and [Faculty Advisors](https://handbook.rcos.io/#/leadership/faculty) at <rcos-leadership@googlegroups.com>. You, as well as any other witnesses, have the right to remain anonymous to the rest of the RCOS community.
 
-## Enforcement Guidelines
+If you are uncomfortable reporting to the Coordinators for any reason, you may reach out to a Faculty Advisor directly via the RCOS [Discord](https://rcos.io/register).
 
-Community leaders will follow these Community Impact Guidelines in determining
-the consequences for any action they deem in violation of this Code of Conduct:
+## Project Maintainer Responsibilities
 
-### 1. Correction
+Project maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, wiki edits, issues, and other contributions that are not aligned to this Code of Conduct. In the case of contributors external to RPI and/or RCOS, temporary or permanent bans may occur. RPI-specific policies are outlined in the RCOS [Bylaws](https://rcos.github.io/rcos-handbook/#/community/bylaws).
 
-**Community Impact**: Use of inappropriate language or other behavior deemed
-unprofessional or unwelcome in the community.
+## [Your Project]-Specific Guidelines
 
-**Consequence**: A private, written warning from community leaders, providing
-clarity around the nature of the violation and an explanation of why the
-behavior was inappropriate. A public apology may be requested.
+Add any additional ground rules you would like your project team to follow (if any) here.
 
-### 2. Warning
+Ground rules regarding technical or project management aspects of your project should go in your Contributing Guidelines.
 
-**Community Impact**: A violation through a single incident or series
-of actions.
+## License and Attribution
 
-**Consequence**: A warning with consequences for continued behavior. No
-interaction with the people involved, including unsolicited interaction with
-those enforcing the Code of Conduct, for a specified period of time. This
-includes avoiding interactions in community spaces as well as external channels
-like social media. Violating these terms may lead to a temporary or
-permanent ban.
-
-### 3. Temporary Ban
-
-**Community Impact**: A serious violation of community standards, including
-sustained inappropriate behavior.
-
-**Consequence**: A temporary ban from any sort of interaction or public
-communication with the community for a specified period of time. No public or
-private interaction with the people involved, including unsolicited interaction
-with those enforcing the Code of Conduct, is allowed during this period.
-Violating these terms may lead to a permanent ban.
-
-### 4. Permanent Ban
-
-**Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior,  harassment of an
-individual, or aggression toward or disparagement of classes of individuals.
-
-**Consequence**: A permanent ban from any sort of public interaction within
-the community.
-
-## Attribution
-
-This Code of Conduct is adapted from the [Contributor Covenant][homepage],
-version 2.0, available at
-https://www.contributor-covenant.org/version/2/0/code_of_conduct.html.
-
-Community Impact Guidelines were inspired by [Mozilla's code of conduct
-enforcement ladder](https://github.com/mozilla/diversity).
-
-[homepage]: https://www.contributor-covenant.org
-
-For answers to common questions about this code of conduct, see the FAQ at
-https://www.contributor-covenant.org/faq. Translations are available at
-https://www.contributor-covenant.org/translations.
+This Code of Conduct has been adapted from the [RCOS Community Code of Conduct](https://rcos.github.io/rcos-handbook/#/community/CODE_OF_CONDUCT).
