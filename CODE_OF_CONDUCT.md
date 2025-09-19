@@ -1,14 +1,14 @@
-# [Your Project] Code of Conduct
+# MarketMind Code of Conduct
 
-In the interest of fostering an open and welcoming environment, [your project] pledges to be an inclusive and harassment-free experience for all, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, educational background, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+In the interest of fostering an open and welcoming environment, MarketMind pledges to be an inclusive and harassment-free experience for all, regardless of age, body size, disability, ethnicity, gender identity and expression, level of experience, educational background, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
-This Code of Conduct applies to all [your project]-affiliated activity online and offline.
+This Code of Conduct applies to all MarketMind-affiliated activity online and offline.
 
 ## Summary
 
 - [Be respectful and inclusive](#be-respectful-and-inclusive).
 - [Give and be welcoming to constructive feedback](#give-and-be-welcoming-to-constructive-feedback).
-- [Focus on what is best for the [Your Project] community](#focus-on-what-is-best-for-the-community).
+- [Focus on what is best for the MarketMind community](#focus-on-what-is-best-for-the-community).
 - Do not engage in any [unacceptable behaviors](#unacceptable-behaviors).
 - At any point, you may [report CoC violations](#reporting-incidents) to our Coordinators and Faculty Advisors.
 - [Project maintainers](#project-maintainer-responsibilities) should be mindful of the Code of Conduct.
@@ -65,7 +65,7 @@ If you are uncomfortable reporting to the Coordinators for any reason, you may r
 
 Project maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, wiki edits, issues, and other contributions that are not aligned to this Code of Conduct. In the case of contributors external to RPI and/or RCOS, temporary or permanent bans may occur. RPI-specific policies are outlined in the RCOS [Bylaws](https://rcos.github.io/rcos-handbook/#/community/bylaws).
 
-## [Your Project]-Specific Guidelines
+## MarketMind-Specific Guidelines
 
 Add any additional ground rules you would like your project team to follow (if any) here.
 
