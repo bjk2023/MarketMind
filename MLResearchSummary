@@ -1,0 +1,41 @@
+Article Link: https://www.itransition.com/machine-learning/stock-prediction 
+
+Types of ML Models for stock forecasting:
+
+
+1. Autoregressive Integrated Moving Average (ARIMA):
+- statistical model that captures trends, seasonality, and other time-dependent patterns in a single data series
+- good for short term forecasting but harder with non linear relationships and needs it to be stable overtime. 
+
+2. Long Short Term Memory (LSTM):
+- can retain information over a long period of time, good for non linear and complex patterns.
+
+3. Prophet
+- forecasting library developed by Facebook, can handle missing data and is optimized for data with seasonal patterns. More accurate than ARIMA. 
+
+4. Support Vector Model (SVM):
+- algorithm used for classification and regression tasks. 
+- effective for non linear data because they find the optimal seperate the hyperplane in high dimensional feature space 
+
+5. Random Forest
+- combines predictions of multiple decision trees
+- handles large data sets and reduces overfitting, so it is more accurate. 
+
+6. Gradient Boosting
+- builds trees sequentially, where each new tree corrects errors made by previous ones. 
+
+7. K-nearest neighbor
+- distance-based technique to forecast the outcome of a certain event according to the records of its most similar historical situations called "neighbors". 
+- important to normalize the input data so that all features measured on different scales (e.g., stock price vs trading volume) contribute proportionally to the distance calculation, 
+ensuring accurate neighbor selection and high prediction quality.
+
+Hybrid + Ensemble Models
+
+1. XGBoost + LSTM: A common hybrid approach where XGBoost is used for feature selection and the LSTM model is used for the actual time-series forecasting. 
+This can produce superior results by leveraging the strengths of both models.
+  
+2. LSTM + CNN: Combining a Convolutional Neural Network (CNN) with an LSTM can help identify short-term signals (CNN) and long-term trends (LSTM), 
+improving accuracy over either model alone.
+
+3. Sentiment analysis integration: Many hybrid models combine traditional financial data with sentiment scores derived from news articles and social media. Using Natural Language Processing (NLP), 
+these models gauge market sentiment to inform their predictions, leading to enhanced accuracy. 
