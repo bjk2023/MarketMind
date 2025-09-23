@@ -1,8 +1,67 @@
 Article Link: https://www.itransition.com/machine-learning/stock-prediction 
 
+
+Summary of article: The article from Itransition discusses how machine learning (ML) can enhance stock market forecasting by analyzing large datasets, 
+including historical prices, financial indicators, and market sentiment. ML models help traders identify optimal entry and exit points, manage portfolios, 
+and implement algorithmic or high-frequency trading strategies, ultimately improving returns and reducing risks. Real-world implementations, such as 
+Itransition’s proprietary portfolio management platform, combine historical and real-time data to provide timely trading alerts and strategy recommendations, 
+often outperforming traditional benchmarks like the S&P 500.
+
+Summary of Research: 
+
+Python Libraries for Implementation:
+Pandas: Data manipulation, cleaning, and time-series handling.
+NumPy: Numerical computations, array operations, linear algebra.
+scikit-learn: Provides implementations for SVM, Random Forest, Gradient Boosting, KNN, and preprocessing utilities.
+
 Types of ML Models for stock forecasting:
 
+1. Classical Statistical Model
+ARIMA (Autoregressive Integrated Moving Average)
+Captures trends, seasonality, and temporal dependencies.
+Good for short-term predictions on stable data.
+Limitations: struggles with non-linear patterns; requires stationary data.
+Libraries: statsmodels in Python.
 
+
+2. Neural Network Models
+LSTM (Long Short-Term Memory)
+- Recurrent Neural Network capable of remembering long-term dependencies.
+- Handles complex, non-linear patterns well.
+- Libraries: Keras, TensorFlow, PyTorch.
+Hybrid Approaches
+- XGBoost + LSTM: XGBoost selects important features; LSTM forecasts time series.
+- LSTM + CNN: CNN captures short-term patterns, LSTM handles long-term trends.
+- Sentiment-Integrated Models: Combine financial data with NLP-based sentiment analysis to improve prediction accuracy.
+
+
+3. Ensemble & Tree-Based Models
+Random Forest
+- Aggregates multiple decision trees for better stability and reduced overfitting.
+- Handles large datasets well.
+- Libraries: scikit-learn.
+Gradient Boosting
+- Builds trees sequentially; each tree corrects the errors of the previous.
+- Libraries: scikit-learn, XGBoost, LightGBM.
+
+4. Other Machine Learning Models
+Support Vector Machine (SVM)
+- Effective for regression and classification, especially non-linear data.
+- Works by finding the optimal separating hyperplane in high-dimensional space.
+- Libraries: scikit-learn.
+K-Nearest Neighbors (KNN)
+- Predicts values based on the outcomes of the closest historical “neighbors.”
+- Important to normalize features (stock price, volume, etc.) for proper distance calculation.
+- Libraries: scikit-learn.
+
+
+5. Forecasting Libraries
+Prophet (Facebook)
+- Designed for time-series forecasting with seasonal effects and missing data.
+- Often more accurate and easier to tune than ARIMA.
+- Libraries: prophet (Python).
+
+Research no order: 
 1. Autoregressive Integrated Moving Average (ARIMA):
 - statistical model that captures trends, seasonality, and other time-dependent patterns in a single data series
 - good for short term forecasting but harder with non linear relationships and needs it to be stable overtime. 
