@@ -1,0 +1,32 @@
+https://www.geeksforgeeks.org/machine-learning/stock-price-prediction-using-machine-learning-in-python
+
+This GeeksforGeeks article explains how to predict stock prices using machine learning in Python, 
+with Tesla's stock data as a case study.
+
+Process Overview
+The article details a complete workflow for building a predictive model:
+
+Data Handling: It starts by importing essential libraries like Pandas, NumPy, and Scikit-learn,
+ then loads and explores the dataset.
+
+Exploratory Data Analysis (EDA): The author visualizes data to understand trends and distributions.
+
+Feature Engineering: New, potentially predictive features are created from existing data. For example,
+ the 'Date' is broken down into 'day', 'month', and 'year'.
+
+Modeling: The data is split into training and validation sets, and features are normalized. 
+Three models are trained:
+
+Logistic Regression
+
+Support Vector Machine (SVM)
+
+XGBoost
+
+Evaluation: The models' performance is evaluated using the ROC-AUC score.
+
+Conclusion
+While XGBoost showed high accuracy on the training data, it appeared to overfit. Logistic Regression, 
+despite having lower accuracy, demonstrated more consistent performance. Ultimately, the author 
+concludes that the models' predictions were not significantly better than random guessing, 
+suggesting that more data or more complex models might be needed for this task.
