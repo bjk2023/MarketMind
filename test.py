@@ -40,9 +40,18 @@ def estimate_new(df, numdays=1):
 
     return df_new
 
+def good_model(df_actual, df_predicted):
+    mae = (df_actual['Close'] - df_predicted['Close']).abs().mean().item()
+    avg_daily_change = df_actual['Close'].diff().abs().mean().item()
+    print("Mean Absolute Error (MAE): ", mae)
+    print("Average Daily Change: ", avg_daily_change)
+    if mae < avg_daily_change:
+        return True
+    return False
+
 if __name__ == "__main__":
     #Create Dataset
-    dataset = create_dataset('AAPL', '100y')
+    dataset = create_dataset('GOOGL', '50y')
     print(dataset.tail(5))
     print(len(dataset))
 
@@ -57,8 +66,21 @@ if __name__ == "__main__":
 
     #Estimate next 5 days based on past 5 days
     new_df = estimate_new(data_past_five, numdays=5)
-    print(new_df.iloc[len(new_df)-5:])
+    result = new_df.iloc[-5:]
 
     #Estimate next 5 days based on all previous values
     new_df = estimate_new(dataset, numdays=5)
-    print(new_df.iloc[len(new_df)-5:])
+    result = new_df.iloc[-5:]
+
+    #Estimate past 5 days based on all previous values and compare
+    new_df = estimate_new(dataset.iloc[:-5], numdays=5)
+    print("Stock Predictions: ")
+    print(new_df.iloc[-5:])
+    print("Stock Values: ")
+    print(dataset.iloc[-5:])
+
+    #Evaulating the model using Mean Absolute Error (MAE)
+    if good_model(dataset.iloc[-5:], new_df.iloc[-5:]):
+        print("Model is good")
+    else:
+        print("Model is not good")
