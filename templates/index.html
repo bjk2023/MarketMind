@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketMind - Stock Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-2.33.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MarketMind</h1>
+            <p>AI-Powered Stock Forecasting</p>
+        </header>
+
+        <main>
+                        <div class="form-container">
+                <form id="stock-form" method="POST">
+                    <div class="input-group">
+                        <input type="text" name="ticker" placeholder="Enter Stock Ticker (e.g., AAPL)" value="{{ ticker }}" required>
+                        <input type="date" name="start_date" value="{{ start_date }}">
+                        <input type="date" name="end_date" value="{{ end_date }}">
+                    </div>
+                    <div class="button-group">
+                        <button type="submit">Analyze</button>
+                        <button type="button" id="clear-button">Clear</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="loader" class="loader" style="display: none;"></div>
+
+            {% if error_message %}
+                <div class="error-message">
+                    <p>{{ error_message }}</p>
+                </div>
+            {% endif %}
+
+            <div class="chart-container" {% if graph_json %}data-graph='{{ graph_json|safe }}'{% endif %}>
+                {% if graph_json %}
+                    <div id="stock-chart" class="chart-active"></div>
+                {% else %}
+                    <div class="placeholder">
+                        <p>Enter a stock ticker to generate a chart.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 MarketMind. An RCOS Project.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('stock-form');
+            const loader = document.getElementById('loader');
+            const chartContainer = document.querySelector('.chart-container');
+            const clearButton = document.getElementById('clear-button');
+
+            form.addEventListener('submit', function() {
+                loader.style.display = 'block';
+                chartContainer.classList.add('loading');
+            });
+
+            clearButton.addEventListener('click', function() {
+                form.querySelector('input[name="ticker"]').value = '';
+                form.querySelector('input[name="start_date"]').value = '';
+                form.querySelector('input[name="end_date"]').value = '';
+            });
+
+            const graphDataElement = document.querySelector('[data-graph]');
+            if (graphDataElement) {
+                try {
+                    const graphJson = graphDataElement.getAttribute('data-graph');
+                    const graph = JSON.parse(graphJson);
+                    if (graph.data) {
+                        Plotly.newPlot('stock-chart', graph.data, graph.layout, {responsive: true});
+                    }
+                } catch (e) {
+                    console.error('Error parsing or plotting graph data:', e);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

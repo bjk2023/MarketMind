@@ -5,25 +5,21 @@ import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
 
-def fetch_stock_data(ticker, period="1y"):
+def fetch_stock_data(ticker, start_date, end_date):
     """
-    Fetch historical stock data using yfinance with error handling and data validation
+    Fetch historical stock data using yfinance for a specific date range.
     
     Args:
-        ticker (str): Stock ticker symbol (e.g., 'AAPL')
-        period (str): Time period to fetch data for (1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max)
+        ticker (str): Stock ticker symbol (e.g., 'AAPL').
+        start_date (str): Start date in 'YYYY-MM-DD' format.
+        end_date (str): End date in 'YYYY-MM-DD' format.
         
     Returns:
-        pd.DataFrame: DataFrame containing the stock data
+        pd.DataFrame: DataFrame containing the stock data.
     """
     try:
         stock = yf.Ticker(ticker)
-        
-        # Get additional stock info for better error messages
-        info = stock.info
-        
-        # Fetch historical data with 1d interval for smoother visualization
-        df = stock.history(period=period, interval='1d')
+        df = stock.history(start=start_date, end=end_date, interval='1d')
         
         # Check if data was returned
         if df.empty:
@@ -41,16 +37,16 @@ def fetch_stock_data(ticker, period="1y"):
     except Exception as e:
         raise Exception(f"Error fetching data for {ticker}: {str(e)}")
 
-def create_stock_chart(ticker, period="1y"):
+def create_stock_chart(ticker, start_date, end_date):
     """
-    Create an interactive stock price chart with volume and smooth visualization
+    Create an interactive stock price chart for a specific date range.
     
     Args:
-        ticker (str): Stock ticker symbol
-        period (str): Time period for the data (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+        ticker (str): Stock ticker symbol.
+        start_date (str): Start date for the data.
+        end_date (str): End date for the data.
     """
-    # Fetch data with 1d interval for smoother visualization
-    df = fetch_stock_data(ticker, period)
+    df = fetch_stock_data(ticker, start_date, end_date)
     
     # Add smoothed price line using Savitzky-Golay filter
     window_size = min(30, len(df))  # Ensure window size is not larger than data
@@ -144,7 +140,7 @@ def create_stock_chart(ticker, period="1y"):
     # Update layout with smoother transitions and better styling
     fig.update_layout(
         title=dict(
-            text=f'<b>{ticker}</b> Stock Analysis - Last {period.upper()}',
+            text=f'<b>{ticker}</b> Stock Analysis ({start_date} to {end_date})',
             font=dict(size=20, family='Arial, sans-serif'),
             x=0.5,
             xanchor='center'
@@ -290,24 +286,15 @@ def create_stock_chart(ticker, period="1y"):
 if __name__ == "__main__":
     # Example usage with error handling
     try:
-        ticker = "AAPL"  # You can change this to any stock symbol (e.g., 'MSFT', 'GOOGL', 'TSLA')
-        period = "1y"    # Options: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
+        ticker = "AAPL"  # You can change this to any stock symbol
+        start_date = "2023-01-01"
+        end_date = "2023-12-31"
         
-        print(f"Fetching {ticker} data for the last {period}...")
-        fig = create_stock_chart(ticker, period=period)
+        print(f"Fetching {ticker} data from {start_date} to {end_date}...")
+        fig = create_stock_chart(ticker, start_date=start_date, end_date=end_date)
         
-        # Add some loading animation
-        fig.update_layout(
-            title=dict(
-                text=f'<b>{ticker}</b> Loading...',
-                font=dict(size=20, family='Arial, sans-serif'),
-                x=0.5,
-                xanchor='center'
-            )
-        )
-        
-        # Show the figure with smoother rendering
-        fig.show(renderer='browser', config={
+        # Show the figure
+        fig.show(config={
             'scrollZoom': True,
             'displayModeBar': True,
             'displaylogo': False,
