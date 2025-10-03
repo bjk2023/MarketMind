@@ -1,5 +1,5 @@
 cd backend
-venv/bin/activate
+source venv/bin/activate
 python api.py
 
 new terminal

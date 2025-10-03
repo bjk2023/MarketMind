@@ -2,16 +2,43 @@
 # pip install Flask Flask-CORS requests
 import os
 import requests
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request # Make sure to import 'request'
 from flask_cors import CORS
 
 # Initialize the Flask application
 app = Flask(__name__)
-CORS(app)
+# Allow POST and DELETE methods for the watchlist
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Retrieve your Alpha Vantage API key from an environment variable for security
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
+
+# --- NEW: In-memory storage for the watchlist ---
+# Using a set to automatically prevent duplicate tickers
+watchlist = set()
+
+# --- NEW: Endpoint to get the current watchlist ---
+@app.route('/watchlist', methods=['GET'])
+def get_watchlist():
+    """Returns the list of tickers in the watchlist."""
+    return jsonify(list(watchlist))
+
+# --- NEW: Endpoint to add a stock to the watchlist ---
+@app.route('/watchlist/<string:ticker>', methods=['POST'])
+def add_to_watchlist(ticker):
+    """Adds a ticker to the watchlist."""
+    ticker = ticker.upper()
+    watchlist.add(ticker)
+    return jsonify({"message": f"{ticker} added to watchlist.", "watchlist": list(watchlist)}), 201
+
+# --- NEW: Endpoint to remove a stock from the watchlist ---
+@app.route('/watchlist/<string:ticker>', methods=['DELETE'])
+def remove_from_watchlist(ticker):
+    """Removes a ticker from the watchlist."""
+    ticker = ticker.upper()
+    watchlist.discard(ticker) # Use discard to avoid errors if ticker not found
+    return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
 
 
 @app.route('/stock/<string:ticker>')
@@ -124,5 +151,5 @@ def get_chart_data(ticker):
 
 
 if __name__ == '__main__':
+    # Using port 5001 to avoid conflicts with other common ports
     app.run(debug=True, port=5001)
-
