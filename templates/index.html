@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.plot.ly/plotly-2.33.0.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container">
@@ -26,6 +27,7 @@
                     <div class="button-group">
                         <button type="submit">Analyze</button>
                         <button type="button" id="clear-button">Clear</button>
+                        <button type="button" id="news-button" title="Latest News"><i class="fas fa-newspaper"></i></button>
                     </div>
                 </form>
             </div>
@@ -52,6 +54,15 @@
         <footer>
             <p>&copy; 2025 MarketMind. An RCOS Project.</p>
         </footer>
+
+        <!-- News Modal -->
+        <div id="news-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h2>Latest Market News</h2>
+                <div id="news-container"></div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -60,6 +71,10 @@
             const loader = document.getElementById('loader');
             const chartContainer = document.querySelector('.chart-container');
             const clearButton = document.getElementById('clear-button');
+            const newsButton = document.getElementById('news-button');
+            const newsModal = document.getElementById('news-modal');
+            const newsContainer = document.getElementById('news-container');
+            const closeButton = newsModal.querySelector('.close-button');
 
             form.addEventListener('submit', function() {
                 loader.style.display = 'block';
@@ -67,9 +82,71 @@
             });
 
             clearButton.addEventListener('click', function() {
+                // Clear input fields
                 form.querySelector('input[name="ticker"]').value = '';
                 form.querySelector('input[name="start_date"]').value = '';
                 form.querySelector('input[name="end_date"]').value = '';
+
+                // Purge the chart and restore the placeholder
+                const stockChartDiv = document.getElementById('stock-chart');
+                if (stockChartDiv) {
+                    Plotly.purge('stock-chart');
+                    chartContainer.innerHTML = `
+                        <div class="placeholder">
+                            <p>Enter a stock ticker to generate a chart.</p>
+                        </div>
+                    `;
+                }
+            });
+
+            // --- News Modal Logic ---
+            async function fetchAndShowNews() {
+                newsContainer.innerHTML = '<div class="loader-small"></div>'; // Show a small loader
+                newsModal.style.display = 'block';
+
+                try {
+                    const response = await fetch('/api/news');
+                    const articles = await response.json();
+                    
+                    newsContainer.innerHTML = ''; // Clear loader
+
+                    if (articles.length === 0) {
+                        newsContainer.innerHTML = '<p>Could not retrieve news at this time.</p>';
+                        return;
+                    }
+
+                    articles.forEach(article => {
+                        const articleElement = document.createElement('div');
+                        articleElement.className = 'news-article';
+                        articleElement.innerHTML = `
+                            <div class="article-image">
+                                <a href="${article.url}" target="_blank"><img src="${article.image || 'https://via.placeholder.com/150'}" alt="Article image"></a>
+                            </div>
+                            <div class="article-content">
+                                <h4><a href="${article.url}" target="_blank">${article.headline}</a></h4>
+                                <p>${article.summary}</p>
+                                <span>${article.source} - ${new Date(article.datetime * 1000).toLocaleString()}</span>
+                            </div>
+                        `;
+                        newsContainer.appendChild(articleElement);
+                    });
+
+                } catch (error) {
+                    newsContainer.innerHTML = '<p>Error loading news. Please try again later.</p>';
+                    console.error('Error fetching news:', error);
+                }
+            }
+
+            newsButton.addEventListener('click', fetchAndShowNews);
+
+            closeButton.addEventListener('click', () => {
+                newsModal.style.display = 'none';
+            });
+
+            window.addEventListener('click', (event) => {
+                if (event.target == newsModal) {
+                    newsModal.style.display = 'none';
+                }
             });
 
             const graphDataElement = document.querySelector('[data-graph]');

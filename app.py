@@ -1,9 +1,12 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
+from dotenv import load_dotenv
 from src.stock_visualizer import create_stock_chart
+from src.news_fetcher import get_general_news
 from plotly.utils import PlotlyJSONEncoder
 import json
 import pandas as pd
 
+load_dotenv()
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
@@ -39,6 +42,14 @@ def index():
             print(f"Error generating default chart: {e}")
 
     return render_template('index.html', graph_json=graph_json, error_message=error_message, ticker=ticker, start_date=start_date, end_date=end_date)
+
+@app.route('/api/news')
+def news_api():
+    """
+    API endpoint to fetch general market news.
+    """
+    articles = get_general_news()
+    return jsonify(articles)
 
 if __name__ == '__main__':
     app.run(debug=True)
