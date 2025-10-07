@@ -1,18 +1,16 @@
 # To run this file, you need to install Flask, Flask-CORS, yfinance, and pandas:
 # pip install Flask Flask-CORS yfinance pandas
-
+import os
 import yfinance as yf
 from flask import Flask, jsonify
 from flask_cors import CORS
+from test import create_dataset, test_today, estimate_new, good_model
 
 # Initialize the Flask application
 app = Flask(__name__)
 # Allow POST and DELETE methods for the watchlist
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Retrieve your Alpha Vantage API key from an environment variable for security
-ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
-ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
 
 # --- NEW: In-memory storage for the watchlist ---
 # Using a set to automatically prevent duplicate tickers
@@ -88,6 +86,33 @@ def get_stock_data(ticker):
     except Exception as e:
         print(f"An exception occurred while fetching stock data for {ticker}: {e}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/predict/<string:ticker>')
+def predict_stock(ticker):
+    """
+    Predicts the next day's closing price for a given stock ticker.
+    """
+    try:
+        # Create dataset for the last 100 days
+        df = create_dataset(ticker, period="100d")
+        if df.empty:
+            return jsonify({"error": "No historical data available."}), 404
+
+        # Predict the next day
+        next_date, actual_close, predicted_close = test_today(df)
+
+        response = {
+            "symbol": ticker.upper(),
+            "nextDate": next_date.strftime('%Y-%m-%d'),
+            "predictedClose": round(predicted_close, 2),
+            "lastActualClose": round(actual_close, 2)
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        print(f"Error predicting stock {ticker}: {e}")
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
 
 @app.route('/chart/<string:ticker>')

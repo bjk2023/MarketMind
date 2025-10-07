@@ -46,6 +46,7 @@ def estimate_new(df, startdays, numdays=1):
         startdays = startdays + pd.Timedelta(days=1)
     return df
 
+#Evaluating the model using Mean Absolute Error (MAE)
 def good_model(df_actual, df_predicted):
     mae = (df_actual['Close'] - df_predicted['Close']).abs().mean().item()
     avg_daily_change = df_actual['Close'].diff().abs().mean().item()
