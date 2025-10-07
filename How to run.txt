@@ -9,3 +9,4 @@ npm start
 
 
 Alpha vantage free API key: FP4UDMCQJ6ZVNOY3
+FINNHUB_API_KEY=d3ilf8pr01qmn7fkkdp0d3ilf8pr01qmn7fkkdpg

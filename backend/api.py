@@ -5,6 +5,7 @@ import os
 import yfinance as yf
 from flask import Flask, jsonify
 from flask_cors import CORS
+from news_fetcher import get_general_news
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -122,6 +123,15 @@ def get_chart_data(ticker):
     except Exception as e:
         print(f"An exception occurred while fetching chart data for {ticker}: {e}")
         return jsonify({"error": f"An error occurred while fetching chart data: {str(e)}"}), 500
+
+
+@app.route('/api/news')
+def news_api():
+    """
+    API endpoint to fetch general market news.
+    """
+    articles = get_general_news()
+    return jsonify(articles)
 
 
 if __name__ == '__main__':
