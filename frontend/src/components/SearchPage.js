@@ -37,69 +37,22 @@ ChartJS.register(
 const StockChart = ({ chartData }) => {
     const [chartType, setChartType] = useState('line');
 
-    // useMemo will re-calculate the chart configuration only when chartData or chartType changes.
     const chartConfig = useMemo(() => {
-        if (!chartData || chartData.length === 0) {
-            return null;
-        }
-
+        if (!chartData || chartData.length === 0) return null;
         const labels = chartData.map(d => d.date);
-
         const options = {
             responsive: true,
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                title: {
-                    display: true,
-                    text: 'Stock Price History (Last 100 Days)',
-                    font: {
-                        size: 18,
-                    }
-                },
-            },
-             scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'day'
-                    },
-                    ticks: {
-                        source: 'auto',
-                    },
-                },
-             },
+            plugins: { legend: { position: 'top' }, title: { display: true, text: 'Stock Price History (Last 100 Days)', font: { size: 18 } } },
+            scales: { x: { type: 'time', time: { unit: 'day' }, ticks: { source: 'auto' } } },
         };
 
         let data;
         if (chartType === 'candlestick') {
-            data = {
-                datasets: [{
-                    label: 'OHLC',
-                    data: chartData.map(d => ({
-                        x: new Date(d.date).valueOf(),
-                        o: d.open,
-                        h: d.high,
-                        l: d.low,
-                        c: d.close
-                    }))
-                }]
-            };
+            data = { datasets: [{ label: 'OHLC', data: chartData.map(d => ({ x: new Date(d.date).valueOf(), o: d.open, h: d.high, l: d.low, c: d.close })) }] };
         } else {
-             data = {
-                labels,
-                datasets: [{
-                    label: 'Closing Price',
-                    data: chartData.map(d => d.close),
-                    borderColor: 'rgb(53, 162, 235)',
-                    backgroundColor: 'rgba(53, 162, 235, 0.5)',
-                }]
-            };
+             data = { labels, datasets: [{ label: 'Closing Price', data: chartData.map(d => d.close), borderColor: 'rgb(53, 162, 235)', backgroundColor: 'rgba(53, 162, 235, 0.5)' }] };
         }
-
         return { type: chartType, options, data };
-
     }, [chartData, chartType]);
 
     if (!chartConfig) return null;
@@ -107,11 +60,7 @@ const StockChart = ({ chartData }) => {
     return (
          <div className="mt-8 bg-white p-6 rounded-xl shadow-lg animate-fade-in">
             <div className="flex justify-end mb-4">
-                <select
-                    value={chartType}
-                    onChange={(e) => setChartType(e.target.value)}
-                    className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
-                >
+                <select value={chartType} onChange={(e) => setChartType(e.target.value)} className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value="line">Line Chart</option>
                     <option value="bar">Bar Chart</option>
                     <option value="candlestick">Candlestick Chart</option>
@@ -124,7 +73,8 @@ const StockChart = ({ chartData }) => {
     );
 };
 
-const StockDataCard = ({ data }) => {
+// --- THIS COMPONENT IS UPDATED ---
+const StockDataCard = ({ data, onAddToWatchlist }) => {
     const isPositive = data.change >= 0;
     const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
 
@@ -142,9 +92,18 @@ const StockDataCard = ({ data }) => {
                     <h2 className="text-2xl font-bold text-gray-900">{data.companyName} ({data.symbol})</h2>
                     <p className="text-3xl font-bold text-gray-800 mt-2">${data.price.toFixed(2)}</p>
                 </div>
-                <div className={`flex items-center text-lg font-semibold ${changeColor}`}>
-                     {isPositive ? <TrendingUpIcon className="h-6 w-6 mr-1" /> : <TrendingDownIcon className="h-6 w-6 mr-1" />}
-                    <span>{data.change.toFixed(2)} ({data.changePercent.toFixed(2)}%)</span>
+                <div className="text-right">
+                    <div className={`flex items-center justify-end text-lg font-semibold ${changeColor}`}>
+                         {isPositive ? <TrendingUpIcon className="h-6 w-6 mr-1" /> : <TrendingDownIcon className="h-6 w-6 mr-1" />}
+                        <span>{data.change.toFixed(2)} ({data.changePercent.toFixed(2)}%)</span>
+                    </div>
+                     {/* --- THIS BUTTON IS NEW --- */}
+                    <button
+                        onClick={() => onAddToWatchlist(data.symbol)}
+                        className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                        + Add to Watchlist
+                    </button>
                 </div>
             </div>
             <div className="mt-6 space-y-2">
@@ -174,7 +133,6 @@ const SearchPage = () => {
         setError('');
 
         try {
-            // Fetch quote and overview data
             const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
@@ -183,7 +141,6 @@ const SearchPage = () => {
             const stockJson = await stockResponse.json();
             setStockData(stockJson);
 
-            // Fetch chart data
             const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${ticker}`);
              if (!chartResponse.ok) {
                 const errorData = await chartResponse.json();
@@ -196,6 +153,20 @@ const SearchPage = () => {
             setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
         } finally {
             setLoading(false);
+        }
+    };
+
+    // --- THIS FUNCTION IS NEW ---
+    const handleAddToWatchlist = async (tickerToAdd) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:5001/watchlist/${tickerToAdd}`, {
+                method: 'POST',
+            });
+            const result = await response.json();
+             // You can use a more sophisticated notification system later
+            alert(result.message);
+        } catch (err) {
+            alert('Failed to add stock to watchlist. Is the server running?');
         }
     };
 
@@ -226,7 +197,8 @@ const SearchPage = () => {
             </div>
             <div className="w-full max-w-4xl mt-4">
                 {error && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
-                {stockData && <StockDataCard data={stockData} />}
+                {/* --- THIS LINE IS UPDATED --- */}
+                {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
                 {chartData && <StockChart chartData={chartData} />}
             </div>
         </div>
@@ -234,3 +206,4 @@ const SearchPage = () => {
 };
 
 export default SearchPage;
+
