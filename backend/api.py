@@ -2,7 +2,7 @@
 # pip install Flask Flask-CORS yfinance pandas
 
 import yfinance as yf
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 # Initialize the Flask application
@@ -17,14 +17,10 @@ def get_stock_data(ticker):
     It fetches company info and formats it for the frontend data card.
     """
     try:
-        print(f"Fetching stock data for {ticker}...")
         stock = yf.Ticker(ticker)
         info = stock.info
 
-        # A more robust check for a valid ticker.
-        # 'regularMarketPrice' is a good indicator of a valid, publicly traded stock.
         if info.get('regularMarketPrice') is None:
-            print(f"Error: No data found for ticker {ticker}. It may be invalid.")
             return jsonify({"error": f"Invalid ticker symbol '{ticker}' or no data available."}), 404
 
         price = info.get('regularMarketPrice', 0)
@@ -47,15 +43,13 @@ def get_stock_data(ticker):
             "change": change,
             "changePercent": change_percent,
             "marketCap": market_cap_formatted,
-            "peRatio": info.get('trailingPE') or "N/A",  # Use 'or' for a clean fallback
+            "peRatio": info.get('trailingPE') or "N/A",
             "week52High": info.get('fiftyTwoWeekHigh', 0),
             "week52Low": info.get('fiftyTwoWeekLow', 0),
         }
-        print(f"Successfully fetched stock data for {ticker}.")
         return jsonify(formatted_data)
 
     except Exception as e:
-        print(f"An exception occurred while fetching stock data for {ticker}: {e}")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
@@ -63,20 +57,37 @@ def get_stock_data(ticker):
 def get_chart_data(ticker):
     """
     This function gets historical data for the chart using yfinance.
+    It now accepts a 'period' query parameter to fetch different time frames.
     """
+    # Get the period from the request arguments, default to '6mo'
+    period = request.args.get('period', '6mo')
+
+    # Define valid yfinance periods and their corresponding intervals
+    # Shorter periods need smaller intervals to show detail
+    period_interval_map = {
+        "1d": {"period": "1d", "interval": "5m"},
+        "5d": {"period": "5d", "interval": "15m"},
+        "1mo": {"period": "1mo", "interval": "1d"},
+        "6mo": {"period": "6mo", "interval": "1d"},
+        "1y": {"period": "1y", "interval": "1d"},
+    }
+
+    params = period_interval_map.get(period)
+    if not params:
+        return jsonify({"error": "Invalid time frame specified."}), 400
+
     try:
-        print(f"Fetching chart data for {ticker}...")
         stock = yf.Ticker(ticker)
-        hist = stock.history(period="100d", interval="1d")
+        hist = stock.history(period=params["period"], interval=params["interval"])
 
         if hist.empty:
-            print(f"Error: No historical data found for {ticker}.")
-            return jsonify({"error": "Could not retrieve time series data."}), 404
+            return jsonify({"error": "Could not retrieve time series data for the selected period."}), 404
 
+        # Format the data into the structure the frontend expects
         chart_data = []
         for index, row in hist.iterrows():
             chart_data.append({
-                "date": index.strftime('%Y-%m-%d'),
+                "date": index.strftime('%Y-%m-%d %H:%M:%S'),  # Include time for intraday data
                 "open": row['Open'],
                 "high": row['High'],
                 "low": row['Low'],
@@ -84,13 +95,12 @@ def get_chart_data(ticker):
                 "volume": row['Volume']
             })
 
-        print(f"Successfully fetched chart data for {ticker}.")
         return jsonify(chart_data)
 
     except Exception as e:
-        print(f"An exception occurred while fetching chart data for {ticker}: {e}")
         return jsonify({"error": f"An error occurred while fetching chart data: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
+

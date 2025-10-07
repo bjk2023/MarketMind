@@ -1,19 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
-import { Line, Bar, Chart } from 'react-chartjs-2';
+import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
   TimeScale,
+  Filler, // Import Filler plugin
 } from 'chart.js';
-import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
+import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import 'chartjs-adapter-date-fns';
 
 // Register all necessary components for Chart.js
@@ -22,61 +22,103 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
   TimeScale,
+  Filler, // Register Filler plugin
   CandlestickController,
-  CandlestickElement,
-  OhlcController,
-  OhlcElement
+  CandlestickElement
 );
 
+const timeFrames = [
+    { label: '1D', value: '1d' },
+    { label: '5D', value: '5d' },
+    { label: '1M', value: '1mo' },
+    { label: '6M', value: '6mo' },
+    { label: '1Y', value: '1y' },
+];
 
-const StockChart = ({ chartData }) => {
+const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) => {
     const [chartType, setChartType] = useState('line');
 
-    // useMemo will re-calculate the chart configuration only when chartData or chartType changes.
     const chartConfig = useMemo(() => {
-        if (!chartData || chartData.length === 0) {
-            return null;
-        }
+        if (!chartData || chartData.length === 0) return null;
 
-        const labels = chartData.map(d => d.date);
+        const labels = chartData.map(d => new Date(d.date));
 
         const options = {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'top',
-                },
+                legend: { display: false },
                 title: {
                     display: true,
-                    text: 'Stock Price History (Last 100 Days)',
-                    font: {
-                        size: 18,
-                    }
+                    text: `${ticker} Price History (${activeTimeFrame.label})`,
+                    font: { size: 18 },
+                    padding: { top: 10, bottom: 20 }
                 },
             },
-             scales: {
+            scales: {
                 x: {
                     type: 'time',
                     time: {
-                        unit: 'day'
+                        unit: activeTimeFrame.value === '1d' ? 'hour' : 'day',
+                        tooltipFormat: 'MMM dd, yyyy HH:mm',
                     },
-                    ticks: {
-                        source: 'auto',
-                    },
+                    grid: { display: false }
                 },
-             },
+                y: {
+                     grid: { color: 'rgba(200, 200, 200, 0.1)' }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index',
+            },
+            elements: {
+                point: {
+                    radius: 0 // Hide points on the line
+                }
+            }
         };
 
         let data;
-        if (chartType === 'candlestick') {
+        let ChartComponent = Line;
+
+        if (chartType === 'line') {
             data = {
+                labels,
                 datasets: [{
-                    label: 'OHLC',
+                    label: 'Price',
+                    data: chartData.map(d => d.close),
+                    fill: 'start',
+                    // Logic for gradient background color
+                    backgroundColor: (context) => {
+                        const ctx = context.chart.ctx;
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                        const lastPrice = chartData[chartData.length - 1].close;
+                        const firstPrice = chartData[0].close;
+                        const isUp = lastPrice >= firstPrice;
+                        gradient.addColorStop(0, isUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)');
+                        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                        return gradient;
+                    },
+                     // Logic for segmented line color (red/green)
+                    segment: {
+                        borderColor: (ctx) => {
+                            const y1 = ctx.p0.parsed.y;
+                            const y2 = ctx.p1.parsed.y;
+                            return y2 >= y1 ? '#10B981' : '#EF4444';
+                        }
+                    },
+                    borderWidth: 2,
+                }]
+            };
+        } else { // Candlestick
+             data = {
+                datasets: [{
+                    label: `${ticker} OHLC`,
                     data: chartData.map(d => ({
                         x: new Date(d.date).valueOf(),
                         o: d.open,
@@ -86,40 +128,46 @@ const StockChart = ({ chartData }) => {
                     }))
                 }]
             };
-        } else {
-             data = {
-                labels,
-                datasets: [{
-                    label: 'Closing Price',
-                    data: chartData.map(d => d.close),
-                    borderColor: 'rgb(53, 162, 235)',
-                    backgroundColor: 'rgba(53, 162, 235, 0.5)',
-                }]
-            };
+            ChartComponent = Chart; // Use the generic Chart component for custom types
         }
 
-        return { type: chartType, options, data };
+        return { type: chartType, options, data, ChartComponent };
 
-    }, [chartData, chartType]);
+    }, [chartData, chartType, ticker, activeTimeFrame]);
 
     if (!chartConfig) return null;
+    const { type, options, data, ChartComponent } = chartConfig;
 
     return (
-         <div className="mt-8 bg-white p-6 rounded-xl shadow-lg animate-fade-in">
-            <div className="flex justify-end mb-4">
+        <div className="mt-8 bg-white p-4 sm:p-6 rounded-xl shadow-lg animate-fade-in">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                 <div className="flex items-center space-x-1 bg-gray-100 p-1 rounded-lg">
+                    {timeFrames.map((frame) => (
+                        <button
+                            key={frame.value}
+                            onClick={() => onTimeFrameChange(frame)}
+                            className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors duration-200 ${
+                                activeTimeFrame.value === frame.value
+                                ? 'bg-blue-600 text-white shadow'
+                                : 'text-gray-600 hover:bg-gray-200'
+                            }`}
+                        >
+                            {frame.label}
+                        </button>
+                    ))}
+                </div>
                 <select
                     value={chartType}
                     onChange={(e) => setChartType(e.target.value)}
-                    className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="p-2 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                 >
                     <option value="line">Line Chart</option>
-                    <option value="bar">Bar Chart</option>
-                    <option value="candlestick">Candlestick Chart</option>
+                    <option value="candlestick">Candlestick</option>
                 </select>
             </div>
-            {chartType === 'line' && <Line options={chartConfig.options} data={chartConfig.data} />}
-            {chartType === 'bar' && <Bar options={chartConfig.options} data={chartConfig.data} />}
-            {chartType === 'candlestick' && <Chart type='candlestick' options={chartConfig.options} data={chartConfig.data} />}
+            <div className="h-96">
+                <ChartComponent type={type} options={options} data={data} />
+            </div>
         </div>
     );
 };
@@ -131,7 +179,7 @@ const StockDataCard = ({ data }) => {
     const DataRow = ({ label, value }) => (
         <div className="flex justify-between py-3 border-b border-gray-200 last:border-b-0">
             <span className="text-sm text-gray-500">{label}</span>
-            <span className="text-sm font-medium text-gray-800">{value}</span>
+            <span className="text-sm font-medium text-gray-800">{String(value)}</span>
         </div>
     );
 
@@ -147,7 +195,7 @@ const StockDataCard = ({ data }) => {
                     <span>{data.change.toFixed(2)} ({data.changePercent.toFixed(2)}%)</span>
                 </div>
             </div>
-            <div className="mt-6 space-y-2">
+            <div className="mt-6">
                 <DataRow label="Market Cap" value={data.marketCap} />
                 <DataRow label="P/E Ratio" value={data.peRatio} />
                 <DataRow label="52 Week High" value={`$${data.week52High.toFixed(2)}`} />
@@ -159,10 +207,32 @@ const StockDataCard = ({ data }) => {
 
 const SearchPage = () => {
     const [ticker, setTicker] = useState('');
+    const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
     const [chartData, setChartData] = useState(null);
+    const [activeTimeFrame, setActiveTimeFrame] = useState(timeFrames.find(f => f.value === '6mo'));
     const [loading, setLoading] = useState(false);
+    const [chartLoading, setChartLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const fetchChartData = async (symbol, timeFrame) => {
+        setChartLoading(true);
+        setError('');
+        try {
+            const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${symbol}?period=${timeFrame.value}`);
+            if (!chartResponse.ok) {
+                const errorData = await chartResponse.json();
+                throw new Error(errorData.error || 'Chart data not found');
+            }
+            const chartJson = await chartResponse.json();
+            setChartData(chartJson);
+        } catch (err) {
+            setError(err.message);
+            setChartData(null); // Clear chart on error
+        } finally {
+            setChartLoading(false);
+        }
+    };
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -173,8 +243,10 @@ const SearchPage = () => {
         setChartData(null);
         setError('');
 
+        const defaultTimeFrame = timeFrames.find(f => f.value === '6mo');
+        setActiveTimeFrame(defaultTimeFrame);
+
         try {
-            // Fetch quote and overview data
             const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
@@ -182,20 +254,23 @@ const SearchPage = () => {
             }
             const stockJson = await stockResponse.json();
             setStockData(stockJson);
+            setSearchedTicker(ticker);
 
-            // Fetch chart data
-            const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${ticker}`);
-             if (!chartResponse.ok) {
-                const errorData = await chartResponse.json();
-                throw new Error(errorData.error || 'Chart data not found');
-            }
-            const chartJson = await chartResponse.json();
-            setChartData(chartJson);
+            // After getting stock data, fetch chart data
+            await fetchChartData(ticker, defaultTimeFrame);
 
         } catch (err) {
             setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
+            setSearchedTicker('');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTimeFrameChange = (timeFrame) => {
+        setActiveTimeFrame(timeFrame);
+        if (searchedTicker) {
+            fetchChartData(searchedTicker, timeFrame);
         }
     };
 
@@ -225,12 +300,21 @@ const SearchPage = () => {
                 </form>
             </div>
             <div className="w-full max-w-4xl mt-4">
-                {error && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
+                {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
                 {stockData && <StockDataCard data={stockData} />}
-                {chartData && <StockChart chartData={chartData} />}
+                {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
+                {chartData && !chartLoading && (
+                    <StockChart
+                        chartData={chartData}
+                        ticker={searchedTicker}
+                        onTimeFrameChange={handleTimeFrameChange}
+                        activeTimeFrame={activeTimeFrame}
+                    />
+                )}
             </div>
         </div>
     );
 };
 
 export default SearchPage;
+
