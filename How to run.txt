@@ -1,0 +1,12 @@
+cd backend
+venv/bin/activate
+export ALPHA_VANTAGE_API_KEY="YOUR_KEY_HERE"       - To avoid pasting your secret key directly into your code (which is insecure), you stored it as an environment variable.
+python api.py
+
+new terminal
+
+cd frontend
+npm start
+
+
+Alpha vantage free API key: FP4UDMCQJ6ZVNOY3
