@@ -1,8 +1,8 @@
-# To run this file, you need to install Flask, Flask-CORS, and requests:
-# pip install Flask Flask-CORS requests
-import os
-import requests
-from flask import Flask, jsonify, request # Make sure to import 'request'
+# To run this file, you need to install Flask, Flask-CORS, yfinance, and pandas:
+# pip install Flask Flask-CORS yfinance pandas
+
+import yfinance as yf
+from flask import Flask, jsonify
 from flask_cors import CORS
 
 # Initialize the Flask application
@@ -44,110 +44,83 @@ def remove_from_watchlist(ticker):
 @app.route('/stock/<string:ticker>')
 def get_stock_data(ticker):
     """
-    This function handles requests for a specific stock ticker.
-    It fetches live data from the Alpha Vantage API for the main data card.
+    This function handles requests for a specific stock ticker using yfinance.
+    It fetches company info and formats it for the frontend data card.
     """
-    if not ALPHA_VANTAGE_API_KEY:
-        return jsonify({"error": "API key is missing. Please set the ALPHA_VANTAGE_API_KEY environment variable."}), 500
-
-    overview_params = {"function": "OVERVIEW", "symbol": ticker, "apikey": ALPHA_VANTAGE_API_KEY}
-    quote_params = {"function": "GLOBAL_QUOTE", "symbol": ticker, "apikey": ALPHA_VANTAGE_API_KEY}
-
     try:
-        overview_response = requests.get(ALPHA_VANTAGE_BASE_URL, params=overview_params)
-        overview_response.raise_for_status()
-        overview_data = overview_response.json()
+        print(f"Fetching stock data for {ticker}...")
+        stock = yf.Ticker(ticker)
+        info = stock.info
 
-        quote_response = requests.get(ALPHA_VANTAGE_BASE_URL, params=quote_params)
-        quote_response.raise_for_status()
-        quote_data = quote_response.json()
-
-        if "Note" in overview_data or "Note" in quote_data:
-            return jsonify(
-                {"error": "API rate limit reached (5 calls per minute). Please wait a moment and try again."}), 429
-
-        global_quote = quote_data.get("Global Quote", {})
-        if not overview_data or not global_quote or not overview_data.get("Symbol"):
+        # A more robust check for a valid ticker.
+        # 'regularMarketPrice' is a good indicator of a valid, publicly traded stock.
+        if info.get('regularMarketPrice') is None:
+            print(f"Error: No data found for ticker {ticker}. It may be invalid.")
             return jsonify({"error": f"Invalid ticker symbol '{ticker}' or no data available."}), 404
 
-        market_cap_str = overview_data.get('MarketCapitalization', "0")
-        market_cap_int = int(market_cap_str)
+        price = info.get('regularMarketPrice', 0)
+        previous_close = info.get('previousClose', price)
+        change = price - previous_close
+        change_percent = (change / previous_close) * 100 if previous_close else 0
 
+        market_cap_int = info.get('marketCap', 0)
         if market_cap_int >= 1_000_000_000_000:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000_000:.2f}T"
-        else:
+        elif market_cap_int > 0:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000:.2f}B"
+        else:
+            market_cap_formatted = "N/A"
 
         formatted_data = {
-            "symbol": overview_data.get("Symbol"),
-            "companyName": overview_data.get("Name"),
-            "price": float(global_quote.get("05. price", 0)),
-            "change": float(global_quote.get("09. change", 0)),
-            "changePercent": float(global_quote.get("10. change percent", "0%").replace('%', '')),
+            "symbol": info.get('symbol', ticker.upper()),
+            "companyName": info.get('longName', 'N/A'),
+            "price": price,
+            "change": change,
+            "changePercent": change_percent,
             "marketCap": market_cap_formatted,
-            "peRatio": float(overview_data.get("PERatio", 0)),
-            "week52High": float(overview_data.get("52WeekHigh", 0)),
-            "week52Low": float(overview_data.get("52WeekLow", 0)),
+            "peRatio": info.get('trailingPE') or "N/A",  # Use 'or' for a clean fallback
+            "week52High": info.get('fiftyTwoWeekHigh', 0),
+            "week52Low": info.get('fiftyTwoWeekLow', 0),
         }
+        print(f"Successfully fetched stock data for {ticker}.")
         return jsonify(formatted_data)
 
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Network error: {e}"}), 500
-    except (KeyError, ValueError, TypeError) as e:
-        return jsonify({"error": f"Error parsing API response: {e}"}), 500
+    except Exception as e:
+        print(f"An exception occurred while fetching stock data for {ticker}: {e}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
 @app.route('/chart/<string:ticker>')
 def get_chart_data(ticker):
     """
-    This function handles requests for historical chart data.
-    It now uses TIME_SERIES_DAILY which is more reliable on the free plan.
+    This function gets historical data for the chart using yfinance.
     """
-    if not ALPHA_VANTAGE_API_KEY:
-        return jsonify({"error": "API key is missing. Please set the ALPHA_VANTAGE_API_KEY environment variable."}), 500
-
-    chart_params = {
-        # --- THIS IS THE ONLY LINE THAT CHANGED ---
-        "function": "TIME_SERIES_DAILY",
-        "symbol": ticker,
-        "outputsize": "compact",
-        "apikey": ALPHA_VANTAGE_API_KEY
-    }
-
     try:
-        response = requests.get(ALPHA_VANTAGE_BASE_URL, params=chart_params)
-        response.raise_for_status()
-        data = response.json()
+        print(f"Fetching chart data for {ticker}...")
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="100d", interval="1d")
 
-        if "Note" in data:
-            return jsonify({"error": "API rate limit reached (5 calls per minute). Please wait and try again."}), 429
-
-        time_series = data.get('Time Series (Daily)')
-        if not time_series:
-            error_message = data.get("Error Message",
-                                     "Could not retrieve time series data. The ticker may be invalid or delisted.")
-            return jsonify({"error": error_message}), 404
+        if hist.empty:
+            print(f"Error: No historical data found for {ticker}.")
+            return jsonify({"error": "Could not retrieve time series data."}), 404
 
         chart_data = []
-        # NOTE: The keys for raw data are different (e.g., '1. open' vs '1. open')
-        # We also need to handle volume key change ('6. volume' to '5. volume')
-        for date, values in time_series.items():
+        for index, row in hist.iterrows():
             chart_data.append({
-                "date": date,
-                "open": float(values.get('1. open', 0)),
-                "high": float(values.get('2. high', 0)),
-                "low": float(values.get('3. low', 0)),
-                "close": float(values.get('4. close', 0)),
-                "volume": int(values.get('5. volume', 0))  # <-- Volume key is different
+                "date": index.strftime('%Y-%m-%d'),
+                "open": row['Open'],
+                "high": row['High'],
+                "low": row['Low'],
+                "close": row['Close'],
+                "volume": row['Volume']
             })
 
-        chart_data.reverse()
+        print(f"Successfully fetched chart data for {ticker}.")
         return jsonify(chart_data)
 
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Network error: {e}"}), 500
-    except (KeyError, ValueError) as e:
-        return jsonify({"error": f"Error parsing chart API response: {e}"}), 500
+    except Exception as e:
+        print(f"An exception occurred while fetching chart data for {ticker}: {e}")
+        return jsonify({"error": f"An error occurred while fetching chart data: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
