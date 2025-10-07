@@ -1,0 +1,11 @@
+cd backend
+source venv/bin/activate
+python api.py
+
+new terminal
+
+cd frontend
+npm start
+
+
+Alpha vantage free API key: FP4UDMCQJ6ZVNOY3
