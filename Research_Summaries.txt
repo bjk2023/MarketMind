@@ -1,0 +1,59 @@
+https://www.geeksforgeeks.org/machine-learning/stock-price-prediction-using-machine-learning-in-python
+
+This GeeksforGeeks article explains how to predict stock prices using machine learning in Python, 
+with Tesla's stock data as a case study.
+
+Process Overview
+The article details a complete workflow for building a predictive model:
+
+Data Handling: It starts by importing essential libraries like Pandas, NumPy, and Scikit-learn,
+ then loads and explores the dataset.
+
+Exploratory Data Analysis (EDA): The author visualizes data to understand trends and distributions.
+
+Feature Engineering: New, potentially predictive features are created from existing data. For example,
+ the 'Date' is broken down into 'day', 'month', and 'year'.
+
+Modeling: The data is split into training and validation sets, and features are normalized. 
+Three models are trained:
+
+Logistic Regression
+
+Support Vector Machine (SVM)
+
+XGBoost
+
+Evaluation: The models' performance is evaluated using the ROC-AUC score.
+
+Conclusion
+While XGBoost showed high accuracy on the training data, it appeared to overfit. Logistic Regression, 
+despite having lower accuracy, demonstrated more consistent performance. Ultimately, the author 
+concludes that the models' predictions were not significantly better than random guessing, 
+suggesting that more data or more complex models might be needed for this task.
+
+Linear regression for stock market prediction
+
+Article link: https://medium.com/@amit25173/linear-regression-for-stock-market-prediction-6039f1ea5c1b
+
+What I Learned
+The main idea is to try and guess where a stock's price will go. One method for doing this is called Linear Regression,
+which basically means drawing a single straight line through a bunch of past data points to see the trend.
+
+The computer's job is to find the "best" line possible—the one that runs closest to all the real data dots.
+
+The Steps I Have to Follow
+The article laid out a clear recipe for me to follow:
+
+Get My Computer Ready: First, I need to add some special tools to Python that can help with numbers and making graphs. The article mentioned using tools like pandas and scikit-learn.
+
+Split My Data in Two: I can't use all my historical data to teach the computer. I have to split it into two piles:
+
+A training pile, which I show the computer so it can learn the pattern and draw its line.
+
+A testing pile, which I keep hidden at first. I use this later to check the computer's work on data it has never seen before.
+
+Check How Good the Guesses Are: Once the computer draws its line, I use the "testing pile" to see how accurate it is. The article mentioned two main ways to score it:
+
+Mean Squared Error (MSE): This score tells me, on average, how far off my computer's guesses were from the real prices. A smaller number is better.
+
+R-squared (R²): This score is between 0 and 1 and tells me how well the line fits the data. A score closer to 1 is better.
