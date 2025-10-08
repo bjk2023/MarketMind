@@ -9,6 +9,32 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+# --- In-memory storage for the watchlist ---
+# Using a set to automatically prevent duplicate tickers
+watchlist = set()
+
+# --- Watchlist Endpoints ---
+
+@app.route('/watchlist', methods=['GET'])
+def get_watchlist():
+    """Returns the list of tickers in the watchlist."""
+    return jsonify(list(watchlist))
+
+@app.route('/watchlist/<string:ticker>', methods=['POST'])
+def add_to_watchlist(ticker):
+    """Adds a ticker to the watchlist."""
+    ticker = ticker.upper()
+    watchlist.add(ticker)
+    return jsonify({"message": f"{ticker} added to watchlist.", "watchlist": list(watchlist)}), 201
+
+@app.route('/watchlist/<string:ticker>', methods=['DELETE'])
+def remove_from_watchlist(ticker):
+    """Removes a ticker from the watchlist."""
+    ticker = ticker.upper()
+    watchlist.discard(ticker) # Use discard to avoid errors if ticker not found
+    return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
+
+# --- Stock Data Endpoints ---
 
 @app.route('/stock/<string:ticker>')
 def get_stock_data(ticker):
@@ -59,11 +85,8 @@ def get_chart_data(ticker):
     This function gets historical data for the chart using yfinance.
     It now accepts a 'period' query parameter to fetch different time frames.
     """
-    # Get the period from the request arguments, default to '6mo'
     period = request.args.get('period', '6mo')
 
-    # Define valid yfinance periods and their corresponding intervals
-    # Shorter periods need smaller intervals to show detail
     period_interval_map = {
         "1d": {"period": "1d", "interval": "5m"},
         "5d": {"period": "5d", "interval": "15m"},
@@ -83,11 +106,10 @@ def get_chart_data(ticker):
         if hist.empty:
             return jsonify({"error": "Could not retrieve time series data for the selected period."}), 404
 
-        # Format the data into the structure the frontend expects
         chart_data = []
         for index, row in hist.iterrows():
             chart_data.append({
-                "date": index.strftime('%Y-%m-%d %H:%M:%S'),  # Include time for intraday data
+                "date": index.strftime('%Y-%m-%d %H:%M:%S'),
                 "open": row['Open'],
                 "high": row['High'],
                 "low": row['Low'],

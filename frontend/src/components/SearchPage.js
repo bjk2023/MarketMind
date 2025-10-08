@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
   TimeScale,
-  Filler, // Import Filler plugin
+  Filler, // Filler is needed for gradient backgrounds
 } from 'chart.js';
 import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import 'chartjs-adapter-date-fns';
@@ -172,7 +172,8 @@ const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) =
     );
 };
 
-const StockDataCard = ({ data }) => {
+
+const StockDataCard = ({ data, onAddToWatchlist }) => {
     const isPositive = data.change >= 0;
     const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
 
@@ -190,9 +191,17 @@ const StockDataCard = ({ data }) => {
                     <h2 className="text-2xl font-bold text-gray-900">{data.companyName} ({data.symbol})</h2>
                     <p className="text-3xl font-bold text-gray-800 mt-2">${data.price.toFixed(2)}</p>
                 </div>
-                <div className={`flex items-center text-lg font-semibold ${changeColor}`}>
-                     {isPositive ? <TrendingUpIcon className="h-6 w-6 mr-1" /> : <TrendingDownIcon className="h-6 w-6 mr-1" />}
-                    <span>{data.change.toFixed(2)} ({data.changePercent.toFixed(2)}%)</span>
+                <div className="text-right">
+                    <div className={`flex items-center justify-end text-lg font-semibold ${changeColor}`}>
+                         {isPositive ? <TrendingUpIcon className="h-6 w-6 mr-1" /> : <TrendingDownIcon className="h-6 w-6 mr-1" />}
+                        <span>{data.change.toFixed(2)} ({data.changePercent.toFixed(2)}%)</span>
+                    </div>
+                    <button
+                        onClick={() => onAddToWatchlist(data.symbol)}
+                        className="mt-4 bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                        + Add to Watchlist
+                    </button>
                 </div>
             </div>
             <div className="mt-6">
@@ -228,7 +237,7 @@ const SearchPage = () => {
             setChartData(chartJson);
         } catch (err) {
             setError(err.message);
-            setChartData(null); // Clear chart on error
+            setChartData(null);
         } finally {
             setChartLoading(false);
         }
@@ -256,7 +265,6 @@ const SearchPage = () => {
             setStockData(stockJson);
             setSearchedTicker(ticker);
 
-            // After getting stock data, fetch chart data
             await fetchChartData(ticker, defaultTimeFrame);
 
         } catch (err) {
@@ -271,6 +279,19 @@ const SearchPage = () => {
         setActiveTimeFrame(timeFrame);
         if (searchedTicker) {
             fetchChartData(searchedTicker, timeFrame);
+        }
+    };
+
+    const handleAddToWatchlist = async (tickerToAdd) => {
+        try {
+            const response = await fetch(`http://127.0.0.1:5001/watchlist/${tickerToAdd}`, {
+                method: 'POST',
+            });
+            const result = await response.json();
+             // You can use a more sophisticated notification system later
+            alert(result.message);
+        } catch (err) {
+            alert('Failed to add stock to watchlist. Is the server running?');
         }
     };
 
@@ -301,7 +322,7 @@ const SearchPage = () => {
             </div>
             <div className="w-full max-w-4xl mt-4">
                 {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
-                {stockData && <StockDataCard data={stockData} />}
+                {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
                 {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
                 {chartData && !chartLoading && (
                     <StockChart
