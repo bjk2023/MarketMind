@@ -116,12 +116,53 @@ const StockDataCard = ({ data, onAddToWatchlist }) => {
     );
 };
 
+const StockPredictionCard = ({ data }) => {
+    const isPositive = data.predictedClose >= data.lastActualClose;
+    const change = data.predictedClose - data.lastActualClose;
+    const changePercent = (change / data.lastActualClose) * 100;
+    const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
+
+    return (
+        <div className="mt-8 bg-white p-6 rounded-xl shadow-lg animate-fade-in">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                        {data.companyName} ({data.symbol})
+                    </h2>
+                    <p className="text-3xl font-bold text-gray-800 mt-2">
+                        Predicted Close: ${data.predictedClose.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Last Actual Close: ${data.lastActualClose.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                        Date: {data.nextDate}
+                    </p>
+                </div>
+                <div className={`flex items-center text-lg font-semibold ${changeColor}`}>
+                    {isPositive ? (
+                        <TrendingUpIcon className="h-6 w-6 mr-1" />
+                    ) : (
+                        <TrendingDownIcon className="h-6 w-6 mr-1" />
+                    )}
+                    <span>
+                        {change >= 0 ? '+' : ''}
+                        {change.toFixed(2)} ({changePercent.toFixed(2)}%)
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SearchPage = () => {
     const [ticker, setTicker] = useState('');
     const [stockData, setStockData] = useState(null);
     const [chartData, setChartData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [predictionData, setPredictionData] = useState(null);
+
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -154,6 +195,32 @@ const SearchPage = () => {
         } finally {
             setLoading(false);
         }
+        try {
+            // Fetch stock data (your existing code)
+            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
+            if (!stockResponse.ok) {
+                const errorData = await stockResponse.json();
+                throw new Error(errorData.error || 'Stock data not found');
+            }
+            const stockJson = await stockResponse.json();
+            setStockData(stockJson);
+
+            // Fetch prediction data
+            const predictionResponse = await fetch(`http://127.0.0.1:5001/predict/${ticker}`);
+            if (!predictionResponse.ok) {
+                const errorData = await predictionResponse.json();
+                throw new Error(errorData.error || 'Prediction not found');
+            }
+            const predictionJson = await predictionResponse.json();
+            setPredictionData(predictionJson);
+
+        // Existing chart fetch...
+        } catch (err) {
+            setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
+        } finally {
+            setLoading(false);
+        }
+
     };
 
     // --- THIS FUNCTION IS NEW ---
@@ -197,13 +264,19 @@ const SearchPage = () => {
             </div>
             <div className="w-full max-w-4xl mt-4">
                 {error && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
-                {/* --- THIS LINE IS UPDATED --- */}
+
+                {/* Regular stock data */}
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
+
+                {/* Prediction card below */}
+                {predictionData && <StockPredictionCard data={predictionData} />}
+                
+                {/* Chart */}
                 {chartData && <StockChart chartData={chartData} />}
             </div>
+
         </div>
     );
 };
 
 export default SearchPage;
-

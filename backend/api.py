@@ -94,6 +94,8 @@ def predict_stock(ticker):
     """
     try:
         # Create dataset for the last 100 days
+        stock = yf.Ticker(ticker)
+        info = stock.info
         df = create_dataset(ticker, period="100d")
         if df.empty:
             return jsonify({"error": "No historical data available."}), 404
@@ -102,6 +104,8 @@ def predict_stock(ticker):
         next_date, actual_close, predicted_close = test_today(df)
 
         response = {
+            "symbol": info.get('symbol', ticker.upper()),
+            "companyName": info.get('longName', 'N/A'),
             "symbol": ticker.upper(),
             "nextDate": next_date.strftime('%Y-%m-%d'),
             "predictedClose": round(predicted_close, 2),
