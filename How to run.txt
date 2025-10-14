@@ -6,6 +6,3 @@ new terminal
 
 cd frontend
 npm start
-
-
-Alpha vantage free API key: FP4UDMCQJ6ZVNOY3

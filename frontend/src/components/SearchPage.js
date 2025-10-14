@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
+import StockChart from './charts/StockChart';
+import StockDataCard from './ui/StockDataCard';
 import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -38,7 +40,7 @@ const timeFrames = [
     { label: '6M', value: '6mo' },
     { label: '1Y', value: '1y' },
 ];
-
+/* OLD CHART
 const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) => {
     const [chartType, setChartType] = useState('line');
 
@@ -213,7 +215,7 @@ const StockDataCard = ({ data, onAddToWatchlist }) => {
         </div>
     );
 };
-
+*/
 const SearchPage = () => {
     const [ticker, setTicker] = useState('');
     const [searchedTicker, setSearchedTicker] = useState('');
