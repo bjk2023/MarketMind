@@ -122,6 +122,92 @@ def get_chart_data(ticker):
     except Exception as e:
         return jsonify({"error": f"An error occurred while fetching chart data: {str(e)}"}), 500
 
+# --- Paper Trading Endpoints ---
+
+paper_portfolio = {
+    "cash": 100000.0,
+    "positions": {}  # {ticker: {"shares": 0, "avg_cost": 0}}
+}
+
+
+@app.route('/paper/portfolio', methods=['GET'])
+def get_paper_portfolio():
+    """Return the current state of the paper trading portfolio."""
+    data = {"cash": paper_portfolio["cash"], "positions": []}
+
+    for ticker, pos in paper_portfolio["positions"].items():
+        stock = yf.Ticker(ticker)
+        price = stock.info.get('regularMarketPrice', 0)
+        prev_close = stock.info.get('previousClose', price)
+
+        current_value = pos["shares"] * price
+        cost_basis = pos["shares"] * pos["avg_cost"]
+        daily_pl = pos["shares"] * (price - prev_close)
+        total_pl = current_value - cost_basis
+
+        data["positions"].append({
+            "ticker": ticker,
+            "shares": pos["shares"],
+            "avg_cost": pos["avg_cost"],
+            "current_price": price,
+            "daily_pl": daily_pl,
+            "total_pl": total_pl
+        })
+
+    return jsonify(data)
+
+
+@app.route('/paper/buy', methods=['POST'])
+def buy_stock():
+    """Simulate buying shares in the paper trading account."""
+    data = request.get_json()
+    ticker = data.get('ticker', '').upper()
+    shares = int(data.get('shares', 0))
+    if shares <= 0:
+        return jsonify({"error": "Shares must be positive"}), 400
+
+    stock = yf.Ticker(ticker)
+    price = stock.info.get('regularMarketPrice')
+    if price is None:
+        return jsonify({"error": f"Invalid ticker: {ticker}"}), 404
+
+    total_cost = shares * price
+    if total_cost > paper_portfolio["cash"]:
+        return jsonify({"error": "Insufficient cash"}), 400
+
+    pos = paper_portfolio["positions"].get(ticker, {"shares": 0, "avg_cost": 0})
+    new_total_shares = pos["shares"] + shares
+    new_avg_cost = ((pos["avg_cost"] * pos["shares"]) + total_cost) / new_total_shares
+
+    paper_portfolio["positions"][ticker] = {"shares": new_total_shares, "avg_cost": new_avg_cost}
+    paper_portfolio["cash"] -= total_cost
+
+    return jsonify({"message": f"Bought {shares} {ticker} at ${price:.2f}"}), 200
+
+
+@app.route('/paper/sell', methods=['POST'])
+def sell_stock():
+    """Simulate selling shares."""
+    data = request.get_json()
+    ticker = data.get('ticker', '').upper()
+    shares = int(data.get('shares', 0))
+    if shares <= 0:
+        return jsonify({"error": "Shares must be positive"}), 400
+
+    pos = paper_portfolio["positions"].get(ticker)
+    if not pos or pos["shares"] < shares:
+        return jsonify({"error": "Not enough shares"}), 400
+
+    stock = yf.Ticker(ticker)
+    price = stock.info.get('regularMarketPrice', 0)
+
+    proceeds = shares * price
+    pos["shares"] -= shares
+    if pos["shares"] == 0:
+        del paper_portfolio["positions"][ticker]
+    paper_portfolio["cash"] += proceeds
+
+    return jsonify({"message": f"Sold {shares} {ticker} at ${price:.2f}"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
