@@ -1,0 +1,8 @@
+cd backend
+source venv/bin/activate
+python api.py
+
+new terminal
+
+cd frontend
+npm start
