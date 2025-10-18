@@ -274,6 +274,56 @@
             );
         };
 
+        const StockPredictionCard = ({ data }) => {
+            const isPositive = data.predictedClose >= data.lastActualClose;
+            const change = data.predictedClose - data.lastActualClose;
+            const changePercent = (change / data.lastActualClose) * 100;
+            const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
+
+            const DataRow = ({ label, value }) => (
+                <div className="flex justify-between py-3 border-b border-gray-200">
+                <span className="text-sm text-gray-500">{label}</span>
+                <span className="text-sm font-medium text-gray-800">{value}</span>
+                </div>
+            );
+
+            return (
+                <div className="mt-8 bg-white p-6 rounded-xl shadow-lg animate-fade-in">
+                <div className="flex justify-between items-start">
+                    <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                        {data.companyName} ({data.symbol})
+                    </h2>
+                    <p className="text-3xl font-bold text-gray-800 mt-2">
+                        ${data.predictedClose.toFixed(2)}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                        Predicted closing price for {data.nextDate}
+                    </p>
+                    </div>
+
+                    <div className={`flex items-center text-lg font-semibold ${changeColor}`}>
+                    {isPositive ? (
+                        <TrendingUpIcon className="h-6 w-6 mr-1" />
+                    ) : (
+                        <TrendingDownIcon className="h-6 w-6 mr-1" />
+                    )}
+                    <span>
+                        {change >= 0 ? '+' : ''}
+                        {change.toFixed(2)} ({changePercent.toFixed(2)}%)
+                    </span>
+                    </div>
+                </div>
+
+                <div className="mt-6 space-y-2">
+                    <DataRow label="Last Actual Close" value={`$${data.lastActualClose.toFixed(2)}`} />
+                    <DataRow label="Predicted Next Close" value={`$${data.predictedClose.toFixed(2)}`} />
+                    <DataRow label="Next Date" value={data.nextDate} />
+                </div>
+                </div>
+            );
+        };
+
         const SearchPage = () => {
             const [ticker, setTicker] = useState('');
             const [stockData, setStockData] = useState(null);

@@ -1,15 +1,17 @@
 # To run this file, you need to install Flask, Flask-CORS, yfinance, and pandas:
 # pip install Flask Flask-CORS yfinance pandas
-
+import os
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from test import create_dataset, test_today, estimate_new, good_model
 
 # Initialize the Flask application
 app = Flask(__name__)
 CORS(app)
 
-# --- In-memory storage for the watchlist ---
+
+# --- NEW: In-memory storage for the watchlist ---
 # Using a set to automatically prevent duplicate tickers
 watchlist = set()
 
@@ -77,6 +79,37 @@ def get_stock_data(ticker):
 
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@app.route('/predict/<string:ticker>')
+def predict_stock(ticker):
+    """
+    Predicts the next day's closing price for a given stock ticker.
+    """
+    try:
+        # Create dataset for the last 100 days
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        df = create_dataset(ticker, period="100d")
+        if df.empty:
+            return jsonify({"error": "No historical data available."}), 404
+
+        # Predict the next day
+        next_date, actual_close, predicted_close = test_today(df)
+
+        response = {
+            "symbol": info.get('symbol', ticker.upper()),
+            "companyName": info.get('longName', 'N/A'),
+            "symbol": ticker.upper(),
+            "nextDate": next_date.strftime('%Y-%m-%d'),
+            "predictedClose": round(predicted_close, 2),
+            "lastActualClose": round(actual_close, 2)
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        print(f"Error predicting stock {ticker}: {e}")
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
 
 @app.route('/chart/<string:ticker>')
