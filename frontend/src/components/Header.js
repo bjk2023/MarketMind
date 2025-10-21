@@ -25,13 +25,12 @@ const Header = ({ activePage, setActivePage }) => {
                     <TrendingUpIcon className="h-8 w-8 text-blue-400 mr-2" />
                     <h1 className="text-xl font-bold tracking-wider">MarketMind</h1>
                 </div>
-                {/* --- UPDATED: Added Watchlist button --- */}
                 <div className="flex items-center space-x-2 bg-gray-900 rounded-lg p-1">
                     <NavButton pageName="search">Search</NavButton>
                     <NavButton pageName="watchlist">Watchlist</NavButton>
+                    {/* THIS BUTTON IS NEW */}
+                    <NavButton pageName="paper">Paper Trading</NavButton>
                     <NavButton pageName="gettingStarted">Getting Started</NavButton>
-                    <NavButton pageName="paperTrading">Paper Trading</NavButton>
-
                 </div>
             </nav>
         </header>
@@ -39,3 +38,4 @@ const Header = ({ activePage, setActivePage }) => {
 };
 
 export default Header;
+
