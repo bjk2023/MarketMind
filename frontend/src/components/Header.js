@@ -30,6 +30,8 @@ const Header = ({ activePage, setActivePage }) => {
                     <NavButton pageName="search">Search</NavButton>
                     <NavButton pageName="watchlist">Watchlist</NavButton>
                     <NavButton pageName="gettingStarted">Getting Started</NavButton>
+                    <NavButton pageName="paperTrading">Paper Trading</NavButton>
+
                 </div>
             </nav>
         </header>
