@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
 import StockChart from './charts/StockChart';
 import StockDataCard from './ui/StockDataCard';
+import StockPredictionCard from './ui/StockPredictionCard';
 import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -178,13 +179,13 @@ const SearchPage = () => {
             <div className="w-full max-w-4xl mt-4">
                 {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
+                {predictionData && !chartLoading && <StockPredictionCard data={predictionData} />}
                 {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
                 {chartData && !chartLoading && (
                     <StockChart
                         chartData={chartData}
                         ticker={searchedTicker}
                         onTimeFrameChange={handleTimeFrameChange}
-                        activeTimeFrame={activeTimeFrame}
                     />
                 )}
             </div>

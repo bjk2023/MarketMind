@@ -4,7 +4,7 @@ import os
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from test import create_dataset, test_today, estimate_new, good_model
+from model import create_dataset, test_today, estimate_new, good_model
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -86,23 +86,23 @@ def predict_stock(ticker):
     Predicts the next day's closing price for a given stock ticker.
     """
     try:
-        # Create dataset for the last 100 days
+        # Create dataset for the last 15 days - predicting today's close using past 14
         stock = yf.Ticker(ticker)
         info = stock.info
-        df = create_dataset(ticker, period="100d")
+        df = create_dataset(ticker, period="15d")
         if df.empty:
             return jsonify({"error": "No historical data available."}), 404
 
-        # Predict the next day
+        # Predict today's closing price
         next_date, actual_close, predicted_close = test_today(df)
 
         response = {
             "symbol": info.get('symbol', ticker.upper()),
             "companyName": info.get('longName', 'N/A'),
             "symbol": ticker.upper(),
-            "nextDate": next_date.strftime('%Y-%m-%d'),
+            "todayDate": next_date.strftime('%Y-%m-%d'),
             "predictedClose": round(predicted_close, 2),
-            "lastActualClose": round(actual_close, 2)
+            "lastActualClose": round(actual_close, 2),
         }
 
         return jsonify(response)
