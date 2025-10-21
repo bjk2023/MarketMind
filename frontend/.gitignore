@@ -6,6 +6,9 @@ backend/venv/
 frontend/.pnp
 frontend/.pnp.js
 
+# build cache - THIS IS THE NEW, IMPORTANT LINE
+frontend/.cache/
+
 # python cache
 __pycache__/
 *.pyc
