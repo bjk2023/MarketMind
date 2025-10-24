@@ -1,5 +1,171 @@
-https://medium.com/@aditib259/predicting-stock-prices-using-lstms-time-series-forecasting-a-step-by-step-guide-a70ebb04bbb8
-Summary: 
+## 1. *“Predicting Stock Prices Using LSTMs: A Step-by-Step Guide to Time Series Forecasting”* by Aditi Babu
 
-https://medium.com/analytics-vidhya/lstms-explained-a-complete-technically-accurate-conceptual-guide-with-keras-2a650327e8f2
-Summary: words...
+**Link:** [https://medium.com/@aditib259/predicting-stock-prices-using-lstms-time-series-forecasting-a-step-by-step-guide-a70ebb04bbb8](https://medium.com/@aditib259/predicting-stock-prices-using-lstms-time-series-forecasting-a-step-by-step-guide-a70ebb04bbb8) ([Medium][1])
+
+### Summary
+
+In this article, Aditi Babu walks the reader through how to use a Long Short-Term Memory (LSTM) neural network to forecast stock prices using time-series data. The guide is practical, code-oriented (in Python) and covers the key stages from data preparation through model building, training, and evaluation. The motivation is that while traditional time-series methods (e.g., ARIMA, exponential smoothing) do well on linear dependencies, stock data often show nonlinear, long-term dependencies which LSTMs are well-suited to capture. ([Medium][1])
+
+Here is a more detailed breakdown of the contents:
+
+1. **Why predict stock prices?**
+
+   * The stock market is influenced by many factors (company earnings, macro-economics, sentiment, geopolitics) and thus price movements are complex. 
+   * Classical time-series models work well when dependencies are simple and stationary, but struggle when the sequence has long-term memory or nonlinear interactions. 
+   * LSTMs, by design, can handle “long-term dependencies” in sequential data, making them attractive for financial forecasting. 
+
+2. **Dataset overview**
+
+   * The author uses historical daily stock price data (closing price) from April 2018 to March 2023, obtained from Yahoo Finance. 
+   * Only the closing price is used for simplicity (though richer features could be added). 
+
+3. **Data preprocessing**
+
+   * **Handling missing values**: Because stock data may have missing days due to holidays or gaps, they fill missing values via forward-fill or interpolation. 
+   * **Feature engineering**: They compute features such as 7-day moving average and 50-day moving average of the closing price, and daily returns (percentage change). 
+   * **Scaling the data**: They use `MinMaxScaler` from scikit-learn to transform the closing price into the range [0,1], since LSTMs perform better when inputs are normalized. 
+   * **Checking for stationarity**: They use the Augmented Dickey-Fuller (ADF) test to check if the series is stationary (i.e., constant mean & variance over time). If the p-value is < 0.05, they treat it as stationary; otherwise, they might consider differencing. 
+   * **Train-test split and sequence creation**: They create a dataset of input/output pairs using a “look_back” window (e.g., using the past 30 days to predict the next day). Then they split into training and test sets (80 : 20 ratio). Code snippet:
+
+     ````python
+     def create_dataset(dataset, look_back=1):
+         dataX, dataY = [], []
+         for i in range(len(dataset) - look_back):
+             dataX.append(dataset[i:(i + look_back)])
+             dataY.append(dataset[i + look_back])
+         return np.array(dataX), np.array(dataY)
+     X, Y = create_dataset(adj_close_values, look_back=30)
+     trainX, testX, trainY, testY = train_test_split(X, Y, test_size=0.2, shuffle=False)
+     ``` :contentReference[oaicite:12]{index=12}
+
+     ````
+
+4. **Exploratory Data Analysis (EDA)**
+   The author performs visual analysis to understand trends, volatility, and feature distributions:
+
+   * Plot closing price versus time: shows long-term trend plus fluctuations. 
+   * Plot moving averages (7-day, 50-day) along with the closing price: helps smooth short-term noise and highlight trend reversals when the moving averages cross. 
+   * Plot daily returns (percentage change) vs time: highlights volatility spikes (positive/negative) which are indicative of market events. 
+   * Box plots for features (price, returns, volume etc): to identify outliers or high variance features. 
+     The author concludes from these EDA steps that the data indeed exhibit trend, noise, volatility, and occasional sharp movements — making the case for a model capable of capturing such complexity rather than a simple linear model. 
+
+5. **Preparing data for LSTM**
+
+   * They reshape the training and test input arrays into 3-D form required by Keras LSTM layers: `(samples, time_steps, features)`. Specifically, with one feature (closing price) and e.g. 60 past days as the time step. 
+   * Example code snippet:
+
+     ````python
+     trainX = np.reshape(trainX, (trainX.shape[0], trainX.shape[1], 1))
+     testX  = np.reshape(testX,  (testX.shape[0],  testX.shape[1],  1))
+     ``` :contentReference[oaicite:19]{index=19}
+
+     ````
+
+6. **Building the LSTM model**
+
+   * Architecture: They use `Sequential()` from `tensorflow.keras.models`, then add layers:
+
+     * An LSTM layer with 50 units, `return_sequences=True`, input shape of (time_steps, 1). 
+     * A Dropout layer (drop rate = 0.2) to reduce overfitting. 
+     * A second LSTM layer with 50 units, `return_sequences=False`. 
+     * Another Dropout layer (0.2). 
+     * A Dense layer with 25 units. 
+     * Final Dense layer with 1 unit (output). 
+   * They compile the model using the ‘adam’ optimizer and mean squared error (MSE) as the loss function. 
+   * The architecture is justified: the stacked LSTM allows capturing more complex temporal patterns; dropout acts as regularizer; final dense layers map to the output price.
+
+7. **Training and evaluation**
+
+   * They train the model for 100 epochs with batch_size=32. 
+   * Post-training, they make predictions on the test set:
+
+     ````python
+     testPredict = model.predict(testX)
+     testPredict = scaler.inverse_transform(testPredict)
+     testY       = scaler.inverse_transform(testY.reshape(-1, 1))
+     ``` :contentReference[oaicite:28]{index=28}  
+     ````
+   * They calculate the Root Mean Squared Error (RMSE) between the actual testY and predicted values. 
+   * They plot the actual vs predicted stock closing prices (after inverse scaling) to visually check how close the predictions align with actual values. 
+   * In their example, the final RMSE score is ~ 286.79 (for the dataset/scale they used). 
+
+8. **Key takeaways & future improvements**
+
+   * They highlight that while LSTMs are more powerful than classical linear models for forecasting sequences with long dependencies, they *still* struggle with the inherent unpredictability and volatility of stock markets (e.g., sudden external shocks).
+   * They suggest improvements:
+
+     * Enhance feature selection: include trading volume, macroeconomic indicators (inflation, interest rates), sentiment analysis (news/media). 
+     * Experiment with advanced architectures: e.g., transformer-based models (BERT/GPT for finance) for richer sequential/temporal understanding. 
+     * Use hybrid models: combine LSTM with classical time-series models (e.g., ARIMA + LSTM) to leverage the strengths of both. 
+   * Final reflection: Stock price prediction remains a *very* difficult challenge; no model can predict perfectly due to external uncertainties. But with careful feature engineering, robust architectures, and realistic expectations, AI-driven forecasting can nevertheless offer value in financial analysis. 
+
+---
+
+## 2. *“LSTMs Explained: A Complete, Technically Accurate, Conceptual Guide with Keras”* by Ryan T. J. J.
+
+**Link:** [https://medium.com/analytics-vidhya/lstms-explained-a-complete-technically-accurate-conceptual-guide-with-keras-2a650327e8f2](https://medium.com/analytics-vidhya/lstms-explained-a-complete-technically-accurate-conceptual-guide-with-keras-2a650327e8f2) 
+
+### Summary
+
+This article is a deep dive into how Long Short-Term Memory (LSTM) networks work from a conceptual and mathematical standpoint, with particular alignment to how they are implemented in Keras. The author aims to clarify confusing terminology, present the internal workings of gates, highlight how to configure LSTMs in Keras, and make sense of hyperparameters such as hidden size, number of layers, and return sequences/states flags. In short: it's less about applying LSTMs and more about understanding them thoroughly. 
+
+Here are the main sections with details:
+
+1. **RNNs and LSTMs**
+
+   * The article begins with a refresher on recurrent neural networks (RNNs): networks where the current step’s output depends not only on the current input but also on previous time-steps (via hidden state). 
+   * It then explains that in practice, two main types of practical RNN cells are used: LSTMs and Gated Recurrent Units (GRUs). In the article the focus is on LSTMs. 
+   * A “regular” RNN cell has a simpler structure but suffers from vanishing/exploding gradients when dealing with long sequences; LSTMs were designed to overcome that by introducing gating mechanisms and a cell state that can propagate across many time-steps. 
+
+2. **Hidden State vs Cell State**
+
+   * The article clarifies the difference between the hidden state (h_t) and cell state (c_t) in an LSTM:
+
+     * Hidden state: encoding of the most recent time-step’s information (i.e., what to pass forward as the “output” of the cell at that time). 
+     * Cell state: “memory” that carries information across many time-steps — the global memory of the sequence seen so far. 
+   * The article gives conceptual illustrations: e.g., in NLP, the cell state remembers information from words going back many tokens; the hidden state is more about the immediate word/context. 
+   * The mechanism: at each time-step, the cell state gets filtered by a forget gate (deciding what to drop), then added to by the input gate (deciding what new information to keep), then finally the output gate produces the hidden state for this step. These operations together allow dynamic control of memory retention. 
+
+3. **General Gate Mechanisms & Equations**
+
+   * The article walks through the internal math of each gate:
+
+     * Sigmoid function (σ) is used to compute scaling factors (between 0 and 1) that determine how much to keep/forget. 
+     * Tanh is used to compute candidate values (between –1 and 1) which represent potential new memory content. 
+   * **Forget gate**: takes previous hidden state h_(t-1) and current input x_t, multiplies by corresponding weights, adds bias, passes through sigmoid → result is a vector of values between 0 and 1. This vector multiplies the previous cell state, thereby deciding how much of the older memory to retain. 
+   * **Input gate and candidate**: similarly, there is a sigmoid gate to decide “how much new information to allow in” and a tanh gate to compute the candidate new memory content. The candidate is then scaled by the input gate’s output and added to the (possibly filtered) cell state. 
+   * **Output gate**: determines what part of the cell state to output as the hidden state (for the next time-step or for output). Uses a sigmoid gate plus a tanh of the new cell state to generate the hidden state. 
+   * The article includes (and references) the actual matrix dimensions and gives a worked example for clarity. 
+
+4. **Gate Operation Dimensions & “Hidden Size”**
+
+   * The article defines “hidden size” (also called num_units) in an LSTM: analogous to the number of neurons in a dense layer. It controls how large the hidden state vector is. 
+   * For example, if the hidden size is 4 and input variables are 5, then the weight matrix for input would be (hidden_size × input_variables) = 4×5, and for hidden state would be (hidden_size × hidden_size) = 4×4. 
+   * They also discuss the role of batch size: when processing in batches, the inputs become matrices (batch_size × time_steps × features) but the weight matrices’ dimensions remain independent of batch size. 
+
+5. **“Hidden Layers” / Stacked LSTMs**
+
+   * The article moves on to model depth: you can stack multiple LSTM layers (e.g., one LSTM feeding its hidden states into another LSTM). This is analogous to using multiple hidden layers in feed-forward networks. 
+   * A stacked LSTM might be useful if you believe your data’s temporal patterns are “high-level” (i.e., there are abstractions built on top of more primitive sequences). For instance, speech recognition: milliseconds → phonemes → words → sentences. 
+   * The article cautions that you should balance hidden size and number of layers: making one very large and the other small isn’t optimal since they both address different aspects of model complexity. 
+
+6. **Model Complexity**
+
+   * The author discusses how to reason about picking hyperparameters:
+
+     * If input variables have many interdependencies (especially nonlinear ones) you may need a larger hidden size. 
+     * If you believe your temporal patterns have many levels of abstraction (deep patterns) you may need deeper networks (more hidden layers). 
+   * The article emphasises trade-offs: more complexity (more hidden units, more layers) means more parameters, which increases risk of overfitting and greater training time. Good regularisation, sufficient data, and proper architecture selection are important.
+
+7. **Quirks with Keras**
+
+   * The article points out some common sources of confusion when using Keras’ `LSTM` layer: specifically the arguments `return_sequences` and `return_state`. 
+   * By default, `return_sequences=False`, which means only the last hidden state is returned (shape: batch_size × hidden_size). If `return_sequences=True`, all hidden states across time-steps are returned (shape: batch_size × time_steps × hidden_size). ([Medium][2])
+   * `return_state=True` would also return the cell state (and hidden state) separately, which is less commonly needed unless you are chaining multiple LSTM layers or doing custom architectures. 
+   * The article gives practical advice: if you are building stacked LSTMs, you’ll want `return_sequences=True` on all but the last layer, so that the next layer receives a full sequence rather than a single vector. On the last layer, you may or may not want sequences. 
+   * The article also provides links to further resources (MachineLearningMastery, StackExchange) discussing these details. 
+
+8. **Conclusion & Resources**
+
+   * The author hopes this guide helps you understand the details of LSTMs (terminology, gating mechanisms, Keras configuration) so you can use them effectively rather than blindly. 
+   * He includes a set of references: conceptual guides, gate-equations, Keras/TensorFlow specific resources, and blog posts on stacked LSTMs and return_sequences vs return_states. 
