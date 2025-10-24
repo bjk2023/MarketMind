@@ -11,7 +11,7 @@ import {
   Tooltip,
   Legend,
   TimeScale,
-  Filler, // Filler is needed for gradient backgrounds
+  Filler,
 } from 'chart.js';
 import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import 'chartjs-adapter-date-fns';
@@ -26,7 +26,7 @@ ChartJS.register(
   Tooltip,
   Legend,
   TimeScale,
-  Filler, // Register Filler plugin
+  Filler,
   CandlestickController,
   CandlestickElement
 );
@@ -93,7 +93,6 @@ const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) =
                     label: 'Price',
                     data: chartData.map(d => d.close),
                     fill: 'start',
-                    // Logic for gradient background color
                     backgroundColor: (context) => {
                         const ctx = context.chart.ctx;
                         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -104,7 +103,6 @@ const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) =
                         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
                         return gradient;
                     },
-                     // Logic for segmented line color (red/green)
                     segment: {
                         borderColor: (ctx) => {
                             const y1 = ctx.p0.parsed.y;
@@ -214,19 +212,54 @@ const StockDataCard = ({ data, onAddToWatchlist }) => {
     );
 };
 
+const StockNewsCard = ({ newsData }) => {
+    return (
+        <div className="mt-8 bg-white p-4 sm:p-6 rounded-xl shadow-lg animate-fade-in">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent News</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {newsData.map((newsItem, index) => (
+                    <a
+                        key={index}
+                        href={newsItem.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                        {newsItem.thumbnail_url && (
+                            <img 
+                                src={newsItem.thumbnail_url} 
+                                alt={newsItem.title} 
+                                className="w-full h-40 object-cover rounded-md mb-3"
+                            />
+                        )}
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2 leading-snug">{newsItem.title}</h3>
+                        <div className="flex justify-between items-center text-sm text-gray-500">
+                            <span className="font-medium">{newsItem.publisher}</span>
+                            <span>{newsItem.publishTime}</span>
+                        </div>
+                    </a>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+
 const SearchPage = () => {
     const [ticker, setTicker] = useState('');
     const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
     const [chartData, setChartData] = useState(null);
+    const [newsData, setNewsData] = useState(null); 
     const [activeTimeFrame, setActiveTimeFrame] = useState(timeFrames.find(f => f.value === '6mo'));
     const [loading, setLoading] = useState(false);
     const [chartLoading, setChartLoading] = useState(false);
+    const [newsLoading, setNewsLoading] = useState(false); 
+
     const [error, setError] = useState('');
 
     const fetchChartData = async (symbol, timeFrame) => {
         setChartLoading(true);
-        setError('');
         try {
             const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${symbol}?period=${timeFrame.value}`);
             if (!chartResponse.ok) {
@@ -236,10 +269,27 @@ const SearchPage = () => {
             const chartJson = await chartResponse.json();
             setChartData(chartJson);
         } catch (err) {
-            setError(err.message);
+            console.warn(err.message); 
             setChartData(null);
         } finally {
             setChartLoading(false);
+        }
+    };
+
+    const fetchNewsData = async (symbol) => {
+        setNewsLoading(true);
+        try {
+            const newsResponse = await fetch(`http://127.0.0.1:5001/news/${symbol}`);
+            if (!newsResponse.ok) {
+                throw new Error('News data not found');
+            }
+            const newsJson = await newsResponse.json();
+            setNewsData(newsJson);
+        } catch (err) {
+            console.warn(err.message); 
+            setNewsData(null);
+        } finally {
+            setNewsLoading(false);
         }
     };
 
@@ -250,12 +300,14 @@ const SearchPage = () => {
         setLoading(true);
         setStockData(null);
         setChartData(null);
+        setNewsData(null); 
         setError('');
 
         const defaultTimeFrame = timeFrames.find(f => f.value === '6mo');
         setActiveTimeFrame(defaultTimeFrame);
 
         try {
+            // --- CORRECTED IP ADDRESS ---
             const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
@@ -265,7 +317,10 @@ const SearchPage = () => {
             setStockData(stockJson);
             setSearchedTicker(ticker);
 
-            await fetchChartData(ticker, defaultTimeFrame);
+            await Promise.all([
+                fetchChartData(ticker, defaultTimeFrame),
+                fetchNewsData(ticker) 
+            ]);
 
         } catch (err) {
             setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
@@ -284,11 +339,11 @@ const SearchPage = () => {
 
     const handleAddToWatchlist = async (tickerToAdd) => {
         try {
+            // --- CORRECTED IP ADDRESS ---
             const response = await fetch(`http://127.0.0.1:5001/watchlist/${tickerToAdd}`, {
                 method: 'POST',
             });
             const result = await response.json();
-             // You can use a more sophisticated notification system later
             alert(result.message);
         } catch (err) {
             alert('Failed to add stock to watchlist. Is the server running?');
@@ -317,12 +372,14 @@ const SearchPage = () => {
                         className="bg-blue-600 text-white font-bold px-8 py-4 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:bg-blue-300"
                     >
                         {loading ? '...' : 'Search'}
-                    </button>
+                    </button> 
                 </form>
             </div>
             <div className="w-full max-w-4xl mt-4">
-                {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
+                {error && !chartLoading && !newsLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
+                
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
+                
                 {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
                 {chartData && !chartLoading && (
                     <StockChart
@@ -332,10 +389,14 @@ const SearchPage = () => {
                         activeTimeFrame={activeTimeFrame}
                     />
                 )}
+
+                {newsLoading && <div className="text-center p-8 text-gray-500">Loading news...</div>}
+                {newsData && newsData.length > 0 && !newsLoading && (
+                    <StockNewsCard newsData={newsData} />
+                )}
             </div>
         </div>
     );
 };
 
 export default SearchPage;
-
