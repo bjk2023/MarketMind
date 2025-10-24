@@ -15,4 +15,3 @@ def test_create_dataset():
 
 if __name__ == "__main__":
     test_create_dataset()
-    print("All tests passed.")

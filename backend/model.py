@@ -21,8 +21,15 @@ def create_dataset(ticker, period):
 def test_today(df):
     today = pd.Timestamp.today().normalize()
     new_df = estimate_new(df, today - pd.Timedelta(days=1))
+    
+    return new_df.tail(1)
+    #return today, new_df["Close"].iloc[-1].item(), new_df["Predicted"].iloc[-1].item()
 
-    return today, new_df["Close"].iloc[-1].item(), new_df["Predicted"].iloc[-1].item()
+def estimate_week(df):
+    today = pd.Timestamp.today().normalize()
+    new_df = estimate_new(df, today - pd.Timedelta(days=1), numdays=7)
+
+    return new_df.tail(7)
 
 #Estimating next day(s) value based on previous values
 def estimate_new(df, startdays, numdays=1):
@@ -65,7 +72,10 @@ if __name__ == "__main__":
     tickers = ['GOOGL','AAPL', 'MSFT', 'AMZN']
     period = '5y'
 
+    estimate_week(create_dataset('AAPL', '5y'))
+    test_today(create_dataset('AAPL', '5y'))
     #Stock loop
+    '''
     for ticker in tickers:
         #Create Dataset
         dataset = create_dataset(ticker, period)
@@ -76,8 +86,8 @@ if __name__ == "__main__":
         data_past_five = dataset.iloc[len(dataset)-6:]
         df_new = test_today(data_past_five)
         print("Todays estimate based on past 5 days\nDate: {}, Expected: {}, Actual: {}\n".format(df_new[0], df_new[1], df_new[2]))
-
-        """#Test model on todays value based on all previous values
+        '''
+"""#Test model on todays value based on all previous values
         test = test_today(dataset)
         print("Todays estimate based on all previous values\nDate: {}, Expected: {}, Actual: {}\n".format(test[0], test[1], test[2]))
 

@@ -2,7 +2,7 @@ import React from 'react';
 import { TrendingUpIcon, TrendingDownIcon } from '../Icons';
 
 const StockPredictionCard = ({ data }) => {
-    const spe = Math.abs((data.predictedClose - data.lastActualClose) / data.lastActualClose) * 100;
+    const spe = Math.abs(((data.recentPredicted - data.recentClose) / data.recentClose) * 100);
     const isAccurate = spe <= 1;
     const changeColor = isAccurate ? 'text-green-500' : 'text-red-500';
 
@@ -23,15 +23,20 @@ const StockPredictionCard = ({ data }) => {
                 </div>
                 <div className="text-right">
                     <div className={`flex items-center justify-end text-lg font-semibold ${changeColor}`}>
-                        <span>Prediction Percentage Error: {spe.toFixed(2)}%</span>
+                        <span>Prediction Error: {spe.toFixed(2)}%</span>
                     </div>
                 </div>
             </div>
             <div className="mt-6 space-y-2">
-                <DataRow label="Predicted Close" value={`$${data.predictedClose.toFixed(2)}`} />
-                <DataRow label="Actual Close" value={`$${data.lastActualClose.toFixed(2)}`} />
-                <DataRow label="Date" value={data.todayDate} />
+                {data.predictions.map((item) => (
+                    <DataRow
+                    key={item.date} // unique key for React
+                    label={item.date}
+                    value={`$${item.predictedClose.toFixed(2)}`}
+                    />
+                ))}
             </div>
+
         </div>
     );
 };
