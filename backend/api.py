@@ -128,6 +128,7 @@ def get_chart_data(ticker):
     period_interval_map = {
         "1d": {"period": "1d", "interval": "5m"},
         "5d": {"period": "5d", "interval": "15m"},
+        "14d": {"period": "14d", "interval": "1d"},
         "1mo": {"period": "1mo", "interval": "1d"},
         "6mo": {"period": "6mo", "interval": "1d"},
         "1y": {"period": "1y", "interval": "1d"},
@@ -154,6 +155,16 @@ def get_chart_data(ticker):
                 "close": row['Close'],
                 "volume": row['Volume']
             })
+        predictions = predict_stock(ticker).get_json()['predictions']
+        for pred in predictions:
+            chart_data.append({
+            "date": pred["date"] + " 00:00:00",
+            "open": None,
+            "high": None,
+            "low": None,
+            "close": pred["predictedClose"],
+            "volume": None
+        })
 
         return jsonify(chart_data)
 

@@ -37,6 +37,7 @@ ChartJS.register(
 const timeFrames = [
     { label: '1D', value: '1d' },
     { label: '5D', value: '5d' },
+    { label: '14D', value: '14d' },
     { label: '1M', value: '1mo' },
     { label: '6M', value: '6mo' },
     { label: '1Y', value: '1y' },
@@ -47,7 +48,7 @@ const SearchPage = () => {
     const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
     const [chartData, setChartData] = useState(null);
-    const [activeTimeFrame, setActiveTimeFrame] = useState(timeFrames.find(f => f.value === '6mo'));
+    const [activeTimeFrame, setActiveTimeFrame] = useState(timeFrames.find(f => f.value === '14d'));
     const [loading, setLoading] = useState(false);
     const [chartLoading, setChartLoading] = useState(false);
     const [error, setError] = useState('');
@@ -82,7 +83,7 @@ const SearchPage = () => {
         setChartData(null);
         setError('');
 
-        const defaultTimeFrame = timeFrames.find(f => f.value === '6mo');
+        const defaultTimeFrame = timeFrames.find(f => f.value === '14d');
         setActiveTimeFrame(defaultTimeFrame);
 
         try {
