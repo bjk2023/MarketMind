@@ -103,7 +103,8 @@ const PredictionDisplay = ({ prediction, loading, error }) => {
         <div className="mt-6 bg-blue-50 p-4 rounded-xl shadow-md border border-blue-200">
             <h3 className="text-lg font-semibold text-blue-800">7-Day Price Prediction</h3>
             <p className="text-2xl font-bold text-blue-900 mt-2">
-                ${prediction.predicted_price.toFixed(2)}
+                {/* --- FIX: Added fallback to prevent crash --- */}
+                ${(prediction.predicted_price || 0).toFixed(2)}
             </p>
             <p className="text-sm text-gray-500">for {prediction.prediction_for_date}</p>
         </div>
@@ -112,7 +113,17 @@ const PredictionDisplay = ({ prediction, loading, error }) => {
 
 // --- MAIN PAGE COMPONENT ---
 function PaperTradingPage() {
-  const [portfolio, setPortfolio] = useState(null);
+  // --- FIX 1: Set a default "shape" for portfolio to prevent crashes ---
+  const [portfolio, setPortfolio] = useState({
+      account_value: 0,
+      daily_gain_loss: 0,
+      total_gain_loss: 0,
+      cash: 0,
+      positions: []
+  });
+  // --- FIX 2: Add a dedicated loading state ---
+  const [isLoading, setIsLoading] = useState(true);
+
   const [ticker, setTicker] = useState('');
   const [shares, setShares] = useState('');
   const [tradeMessage, setTradeMessage] = useState(null);
@@ -130,8 +141,14 @@ function PaperTradingPage() {
   const fetchPortfolio = () => {
     fetch('http://127.0.0.1:5001/paper/portfolio')
       .then(res => res.ok ? res.json() : Promise.reject("Failed to fetch portfolio"))
-      .then(setPortfolio)
-      .catch(err => setTradeMessage({ type: 'error', text: 'Could not connect to the backend.' }));
+      .then(data => {
+          setPortfolio(data);
+          setIsLoading(false); // --- FIX 3: Set loading to false on success ---
+      })
+      .catch(err => {
+          setTradeMessage({ type: 'error', text: 'Could not connect to the backend.' });
+          setIsLoading(false); // --- FIX 4: Set loading to false on error ---
+      });
   };
 
   const handleTrade = async (type) => {
@@ -210,13 +227,15 @@ function PaperTradingPage() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!portfolio) return <div className="text-center mt-10">Loading Portfolio...</div>;
+  // --- FIX 5: Use the new isLoading state for the loading guard ---
+  if (isLoading) return <div className="text-center mt-10">Loading Portfolio...</div>;
 
   const summaryData = [
-    { label: 'Account Value', value: portfolio.account_value },
-    { label: "Day's Gain/Loss", value: portfolio.daily_gain_loss, color: portfolio.daily_gain_loss >= 0 ? 'text-green-600' : 'text-red-600' },
-    { label: 'Total Gain/Loss', value: portfolio.total_gain_loss, color: portfolio.total_gain_loss >= 0 ? 'text-green-600' : 'text-red-600' },
-    { label: 'Cash', value: portfolio.cash },
+    // --- FIX 6: Add fallbacks (|| 0) to ensure values are always numbers ---
+    { label: 'Account Value', value: portfolio.account_value || 0 },
+    { label: "Day's Gain/Loss", value: portfolio.daily_gain_loss || 0, color: (portfolio.daily_gain_loss || 0) >= 0 ? 'text-green-600' : 'text-red-600' },
+    { label: 'Total Gain/Loss', value: portfolio.total_gain_loss || 0, color: (portfolio.total_gain_loss || 0) >= 0 ? 'text-green-600' : 'text-red-600' },
+    { label: 'Cash', value: portfolio.cash || 0 },
   ];
 
   return (
@@ -261,14 +280,16 @@ function PaperTradingPage() {
                 </tr>
             </thead>
             <tbody>
-            {portfolio.positions.map(pos => (
+            {/* --- FIX 7: Add (|| []) to safely map positions --- */}
+            {(portfolio.positions || []).map(pos => (
                 <tr key={pos.ticker} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => handlePositionClick(pos.ticker)}>
                     <td className="p-4 font-medium text-gray-900">{pos.ticker} <span className="block text-xs text-gray-500 font-normal">{pos.companyName}</span></td>
                     <td className="p-4 text-gray-600">{pos.shares}</td>
-                    <td className="p-4 text-gray-600">${pos.avg_cost.toFixed(2)}</td>
-                    <td className="p-4 font-medium text-gray-900">${pos.current_price.toFixed(2)}</td>
-                    <td className={`p-4 font-semibold ${(viewMode === 'total' ? pos.total_pl : pos.daily_pl) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        ${(viewMode === 'total' ? pos.total_pl : pos.daily_pl).toFixed(2)}
+                    {/* --- FIX 8: Add fallbacks (|| 0) to prevent crashes --- */}
+                    <td className="p-4 text-gray-600">${(pos.avg_cost || 0).toFixed(2)}</td>
+                    <td className="p-4 font-medium text-gray-900">${(pos.current_price || 0).toFixed(2)}</td>
+                    <td className={`p-4 font-semibold ${((viewMode === 'total' ? pos.total_pl : pos.daily_pl) || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${((viewMode === 'total' ? pos.total_pl : pos.daily_pl) || 0).toFixed(2)}
                     </td>
                 </tr>
             ))}
@@ -290,4 +311,3 @@ function PaperTradingPage() {
 }
 
 export default PaperTradingPage;
-

@@ -213,6 +213,19 @@ const StockDataCard = ({ data, onAddToWatchlist }) => {
 };
 
 const StockNewsCard = ({ newsData }) => {
+    // Helper to format date
+    const formatDate = (dateString) => {
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+            });
+        } catch (e) {
+            return 'N/A';
+        }
+    };
+    
     return (
         <div className="mt-8 bg-white p-4 sm:p-6 rounded-xl shadow-lg animate-fade-in">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent News</h2>
@@ -223,19 +236,24 @@ const StockNewsCard = ({ newsData }) => {
                         href={newsItem.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                        className="flex flex-col p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                     >
+                        {/* News content */}
+                        <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-2 leading-snug">{newsItem.title}</h3>
+                        </div>
+                        {/* Image on the side if it exists */}
                         {newsItem.thumbnail_url && (
                             <img 
                                 src={newsItem.thumbnail_url} 
                                 alt={newsItem.title} 
-                                className="w-full h-40 object-cover rounded-md mb-3"
+                                className="w-full h-40 object-cover rounded-md my-3"
                             />
                         )}
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2 leading-snug">{newsItem.title}</h3>
-                        <div className="flex justify-between items-center text-sm text-gray-500">
-                            <span className="font-medium">{newsItem.publisher}</span>
-                            <span>{newsItem.publishTime}</span>
+                        {/* Footer */}
+                        <div className="flex justify-between items-center text-sm text-gray-500 mt-2">
+                            <span className="font-medium truncate pr-4">{newsItem.publisher}</span>
+                            <span className="flex-shrink-0">{formatDate(newsItem.publishTime)}</span>
                         </div>
                     </a>
                 ))}
@@ -250,7 +268,7 @@ const SearchPage = () => {
     const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
     const [chartData, setChartData] = useState(null);
-    const [newsData, setNewsData] = useState(null); 
+    const [newsData, setNewsData] = useState(null);
     const [activeTimeFrame, setActiveTimeFrame] = useState(timeFrames.find(f => f.value === '6mo'));
     const [loading, setLoading] = useState(false);
     const [chartLoading, setChartLoading] = useState(false);
@@ -276,10 +294,14 @@ const SearchPage = () => {
         }
     };
 
-    const fetchNewsData = async (symbol) => {
+    // --- UPDATED: fetchNewsData ---
+    // It now takes the company name as a query
+    const fetchNewsData = async (companyName) => {
         setNewsLoading(true);
         try {
-            const newsResponse = await fetch(`http://127.0.0.1:5001/news/${symbol}`);
+            // We must encode the company name to make it URL-safe
+            const query = encodeURIComponent(companyName);
+            const newsResponse = await fetch(`http://127.0.0.1:5001/news?q=${query}`);
             if (!newsResponse.ok) {
                 throw new Error('News data not found');
             }
@@ -293,6 +315,8 @@ const SearchPage = () => {
         }
     };
 
+    // --- UPDATED: handleSearch ---
+    // This logic is changed to fetch stock data first
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!ticker) return;
@@ -307,7 +331,7 @@ const SearchPage = () => {
         setActiveTimeFrame(defaultTimeFrame);
 
         try {
-            // --- CORRECTED IP ADDRESS ---
+            // 1. Fetch stock data first and wait for it
             const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
@@ -317,9 +341,10 @@ const SearchPage = () => {
             setStockData(stockJson);
             setSearchedTicker(ticker);
 
+            // 2. Now that we have the companyName, fetch chart and news in parallel
             await Promise.all([
                 fetchChartData(ticker, defaultTimeFrame),
-                fetchNewsData(ticker) 
+                fetchNewsData(stockJson.companyName) // Pass the company name here
             ]);
 
         } catch (err) {
@@ -339,7 +364,6 @@ const SearchPage = () => {
 
     const handleAddToWatchlist = async (tickerToAdd) => {
         try {
-            // --- CORRECTED IP ADDRESS ---
             const response = await fetch(`http://127.0.0.1:5001/watchlist/${tickerToAdd}`, {
                 method: 'POST',
             });

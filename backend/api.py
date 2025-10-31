@@ -1,5 +1,5 @@
-# To run this file, you need to install Flask, Flask-CORS, yfinance, pandas, scikit-learn, and numpy
-# pip install Flask Flask-CORS yfinance pandas scikit-learn numpy
+# To run this file, you need to install Flask, Flask-CORS, yfinance, pandas, scikit-learn, numpy, and requests
+# pip install Flask Flask-CORS yfinance pandas scikit-learn numpy requests
 
 import yfinance as yf
 from flask import Flask, jsonify, request
@@ -9,10 +9,16 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from datetime import datetime, timedelta
 import sqlite3
+import requests  # <-- NEW IMPORT
 
 # --- Initialize the Flask application ---
 app = Flask(__name__)
 CORS(app)
+
+# --- CONFIGURATION ---
+# !!! IMPORTANT: Paste your new API key here !!!
+# (For a real app, use environment variables, but this is fine for local)
+NEWS_API_KEY = "4f2abfc0913748ee9cedf3b5e5878bcc"
 
 # --- Database Setup ---
 DATABASE = 'marketmind.db'
@@ -25,7 +31,6 @@ def init_db():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        # Create table to store portfolio value over time
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS portfolio_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +38,6 @@ def init_db():
                 portfolio_value REAL NOT NULL
             );
         ''')
-        # Check if there's any data, if not, add the starting value
         cursor.execute("SELECT COUNT(id) FROM portfolio_history")
         if cursor.fetchone()[0] == 0:
             cursor.execute("INSERT INTO portfolio_history (timestamp, portfolio_value) VALUES (?, ?)",
@@ -50,7 +54,7 @@ def init_db():
 watchlist = set()
 paper_portfolio = {
     "cash": 100000.0,
-    "positions": {}  # {ticker: {"shares": 0, "avg_cost": 0}}
+    "positions": {}
 }
 
 # --- Watchlist Endpoints ---
@@ -83,12 +87,12 @@ def get_stock_data(ticker):
         change = price - previous_close
         change_percent = (change / previous_close) * 100 if previous_close else 0
         market_cap_int = info.get('marketCap', 0)
+        market_cap_formatted = "N/A"
         if market_cap_int >= 1_000_000_000_000:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000_000:.2f}T"
         elif market_cap_int > 0:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000:.2f}B"
-        else:
-            market_cap_formatted = "N/A"
+        
         formatted_data = {
             "symbol": info.get('symbol', ticker.upper()), "companyName": info.get('longName', 'N/A'),
             "price": price, "change": change, "changePercent": change_percent, "marketCap": market_cap_formatted,
@@ -120,50 +124,44 @@ def get_chart_data(ticker):
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
-@app.route('/news/<string:ticker>')
-def get_stock_news(ticker):
-    """Fetches recent news articles for a given stock ticker."""
-    try:
-        # --- FIX 1: Sanitize the ticker ---
-        # This handles strange browser requests like 'NVDA:1'
-        sanitized_ticker = ticker.split(':')[0]
+# --- NEW: News Endpoint (Using NewsAPI.org) ---
+@app.route('/news')
+def get_stock_news():
+    """Fetches news from NewsAPI.org based on a query parameter."""
+    query = request.args.get('q')
+    if not query:
+        return jsonify({"error": "A search query ('q') is required."}), 400
         
-        stock = yf.Ticker(sanitized_ticker) # Use the sanitized version
-        news = stock.news
-
-        if not news:
-            return jsonify([])
+    try:
+        # Search for the company name, look in title and description
+        url = (f"https://newsapi.org/v2/everything?"
+               f"q={query}"
+               f"&searchIn=title,description"
+               f"&language=en"
+               f"&pageSize=8"
+               f"&sortBy=relevancy"
+               f"&apiKey={NEWS_API_KEY}")
+               
+        response = requests.get(url)
+        data = response.json()
+        
+        if data.get('status') != 'ok':
+            return jsonify({"error": data.get('message', 'Failed to fetch news from NewsAPI')}), 500
 
         formatted_news = []
-        for item in news:
-            
-            # --- FIX 2: Safely get publish time ---
-            publish_time_unix = item.get('providerPublishTime')
-            if publish_time_unix:
-                publish_time = datetime.fromtimestamp(publish_time_unix).strftime('%Y-%m-%d %H:%M')
-            else:
-                publish_time = "N/A" # Fallback for missing time
-            
-            # Safely get the thumbnail URL
-            thumbnail_url = None
-            if 'thumbnail' in item and 'resolutions' in item['thumbnail'] and len(item['thumbnail']['resolutions']) > 0:
-                thumbnail_url = item['thumbnail']['resolutions'][0].get('url')
-
+        for item in data.get('articles', []):
             formatted_news.append({
                 'title': item.get('title'),
-                'publisher': item.get('publisher'),
-                'link': item.get('link'),
-                'publishTime': publish_time,
-                'thumbnail_url': thumbnail_url
+                'publisher': item.get('source', {}).get('name', 'N/A'),
+                'link': item.get('url'),
+                'publishTime': item.get('publishedAt', 'N/A'),
+                'thumbnail_url': item.get('urlToImage') # This is the key field!
             })
-            
-            # Limit to 8 news items
-            if len(formatted_news) >= 8:
-                break
                 
         return jsonify(formatted_news)
     except Exception as e:
         return jsonify({"error": f"An error occurred while fetching news: {str(e)}"}), 500
+
 # --- Prediction Endpoint ---
 @app.route('/predict/<string:ticker>')
 def predict_stock(ticker):
@@ -197,7 +195,6 @@ def predict_stock(ticker):
 
 # --- Portfolio History Helper Function ---
 def record_portfolio_snapshot():
-    """Calculates total portfolio value and saves it to the history table."""
     total_value = paper_portfolio['cash']
     for ticker, pos in paper_portfolio['positions'].items():
         try:
@@ -258,7 +255,7 @@ def buy_stock():
         new_avg_cost = ((pos["avg_cost"] * pos["shares"]) + total_cost) / new_total_shares
         paper_portfolio["positions"][ticker] = {"shares": new_total_shares, "avg_cost": new_avg_cost}
         paper_portfolio["cash"] -= total_cost
-        record_portfolio_snapshot() # <-- Records history
+        record_portfolio_snapshot()
         return jsonify({"message": f"Successfully bought {shares} shares of {ticker}."}), 200
     except Exception as e:
         return jsonify({"error": f"An error occurred while processing the trade: {str(e)}"}), 500
@@ -283,7 +280,7 @@ def sell_stock():
         if pos["shares"] == 0:
             del paper_portfolio["positions"][ticker]
         paper_portfolio["cash"] += proceeds
-        record_portfolio_snapshot() # <-- Records history
+        record_portfolio_snapshot()
         return jsonify({"message": f"Successfully sold {shares} shares of {ticker}."}), 200
     except Exception as e:
         return jsonify({"error": f"An error occurred while processing the trade: {str(e)}"}), 500
@@ -321,13 +318,11 @@ def get_portfolio_summary():
             return jsonify({"error": "No portfolio history found."}), 404
             
         end_value = end_record[0]
-        
         wealth_generated = end_value - start_value
         cumulative_return_pct = (wealth_generated / start_value) * 100 if start_value != 0 else 0
         
         cursor.execute("SELECT timestamp FROM portfolio_history ORDER BY timestamp ASC LIMIT 1")
         start_date_str = cursor.fetchone()[0]
-        # Handle different possible datetime formats from sqlite
         try:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d %H:%M:%S.%f')
         except ValueError:
