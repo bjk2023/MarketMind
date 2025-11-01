@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Header from './components/Header';
 import SearchPage from './components/SearchPage';
+import PredictionsPage from './components/PredictionsPage';
 import GettingStartedPage from './components/GettingStartedPage';
 // NEW: Import the WatchlistPage component
 import WatchlistPage from './components/WatchlistPage';
@@ -24,6 +25,7 @@ function App() {
             
             <main>
                 {activePage === 'search' && <SearchPage />}
+                {activePage === 'predictions' && <PredictionsPage />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}
                 {activePage === 'watchlist' && <WatchlistPage />}
