@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import Header from './components/Header';
 import SearchPage from './components/SearchPage';
 import GettingStartedPage from './components/GettingStartedPage';
-import PaperTradingPage from './components/PaperTradingPage';
 // NEW: Import the WatchlistPage component
 import WatchlistPage from './components/WatchlistPage';
 
@@ -28,7 +27,6 @@ function App() {
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}
                 {activePage === 'watchlist' && <WatchlistPage />}
-                {activePage === 'paperTrading' && <PaperTradingPage />}
             </main>
         </div>
     );
