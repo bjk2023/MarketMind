@@ -8,7 +8,7 @@ from statsmodels.tsa.ar_model import AutoReg
 def create_dataset(ticker, period):
     try:
         data = yf.download(ticker, period=period, auto_adjust=False)
-    except yf.YFPricesMissingError as e:
+    except yf.shared.YFPricesMissingError as e:
         print(f"[Warning] Could not download data for {ticker}: {e}")
         return pd.DataFrame()
     if isinstance(data.columns, pd.MultiIndex):
@@ -18,12 +18,11 @@ def create_dataset(ticker, period):
     return df
 
 #Testing model on todays value - removing last row and predicting it to compare
-def test_today(df):
+def try_today(df):
     today = pd.Timestamp.today().normalize()
     new_df = estimate_new(df, today - pd.Timedelta(days=1))
     
     return new_df.tail(1)
-    #return today, new_df["Close"].iloc[-1].item(), new_df["Predicted"].iloc[-1].item()
 
 def estimate_week(df):
     today = pd.Timestamp.today().normalize()
@@ -73,42 +72,4 @@ if __name__ == "__main__":
     period = '5y'
 
     estimate_week(create_dataset('AAPL', '5y'))
-    test_today(create_dataset('AAPL', '5y'))
-    #Stock loop
-    '''
-    for ticker in tickers:
-        #Create Dataset
-        dataset = create_dataset(ticker, period)
-
-        print("Stock for {} in {} period: \n".format(ticker, period))
-
-        #Test model on todays value based on past 5 days
-        data_past_five = dataset.iloc[len(dataset)-6:]
-        df_new = test_today(data_past_five)
-        print("Todays estimate based on past 5 days\nDate: {}, Expected: {}, Actual: {}\n".format(df_new[0], df_new[1], df_new[2]))
-        '''
-"""#Test model on todays value based on all previous values
-        test = test_today(dataset)
-        print("Todays estimate based on all previous values\nDate: {}, Expected: {}, Actual: {}\n".format(test[0], test[1], test[2]))
-
-        #Estimate next 5 days based on past 5 days
-        new_df = estimate_new(data_past_five, numdays=5)
-        result = new_df.iloc[-5:]
-        print("Next 5 days estimate based on past 5 days\n", result)
-
-        #Estimate next 5 days based on all previous values
-        new_df = estimate_new(dataset, numdays=5)
-        result = new_df.iloc[-5:]
-        print("Next 5 days estimate based on all previous values\n", result)
-
-        #Estimate past 5 days based on all previous values and compare
-        new_df = estimate_new(dataset.iloc[:-5], numdays=5)
-        print("Next 5 days estimate based on all previous values\n")
-        print("Estimated Values:\n", new_df.iloc[-5:])
-        print("Actual Values:\n", dataset.iloc[-5:])
-
-        #Evaulating the model using Mean Absolute Error (MAE)
-        if good_model(dataset.iloc[-5:], new_df.iloc[-5:]):
-            print("\nModel is good\n")
-        else:
-            print("\nModel is not good\n")"""
+    try_today(create_dataset('AAPL', '5y'))
