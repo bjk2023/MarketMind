@@ -2,20 +2,21 @@ import React, { useState, useMemo } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
 import StockChart from './charts/StockChart';
 import StockDataCard from './ui/StockDataCard';
-import { Line, Bar, Chart } from 'react-chartjs-2';
+import StockPredictionCard from './ui/StockPredictionCard';
+import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
   TimeScale,
+  Filler, // Filler is needed for gradient backgrounds
 } from 'chart.js';
-import { CandlestickController, CandlestickElement, OhlcController, OhlcElement } from 'chartjs-chart-financial';
+import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import 'chartjs-adapter-date-fns';
 
 // Register all necessary components for Chart.js
@@ -24,26 +25,54 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
-  BarElement,
   Title,
   Tooltip,
   Legend,
   TimeScale,
+  Filler, // Register Filler plugin
   CandlestickController,
-  CandlestickElement,
-  OhlcController,
-  OhlcElement
+  CandlestickElement
 );
 
-
-
+const timeFrames = [
+    { label: '1D', value: '1d' },
+    { label: '5D', value: '5d' },
+    { label: '14D', value: '14d' },
+    { label: '1M', value: '1mo' },
+    { label: '6M', value: '6mo' },
+    { label: '1Y', value: '1y' },
+];
 
 const SearchPage = () => {
     const [ticker, setTicker] = useState('');
+    const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
     const [chartData, setChartData] = useState(null);
+    const [activeTimeFrame, setActiveTimeFrame] = useState(timeFrames.find(f => f.value === '14d'));
     const [loading, setLoading] = useState(false);
+    const [chartLoading, setChartLoading] = useState(false);
     const [error, setError] = useState('');
+    const [predictionData, setPredictionData] = useState(null);
+
+
+    const fetchChartData = async (symbol, timeFrame) => {
+        setChartLoading(true);
+        setError('');
+        try {
+            const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${symbol}?period=${timeFrame.value}`);
+            if (!chartResponse.ok) {
+                const errorData = await chartResponse.json();
+                throw new Error(errorData.error || 'Chart data not found');
+            }
+            const chartJson = await chartResponse.json();
+            setChartData(chartJson);
+        } catch (err) {
+            setError(err.message);
+            setChartData(null);
+        } finally {
+            setChartLoading(false);
+        }
+    };
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -54,6 +83,9 @@ const SearchPage = () => {
         setChartData(null);
         setError('');
 
+        const defaultTimeFrame = timeFrames.find(f => f.value === '14d');
+        setActiveTimeFrame(defaultTimeFrame);
+
         try {
             const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
             if (!stockResponse.ok) {
@@ -62,23 +94,51 @@ const SearchPage = () => {
             }
             const stockJson = await stockResponse.json();
             setStockData(stockJson);
+            setSearchedTicker(ticker);
 
-            const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${ticker}`);
-             if (!chartResponse.ok) {
-                const errorData = await chartResponse.json();
-                throw new Error(errorData.error || 'Chart data not found');
+            await fetchChartData(ticker, defaultTimeFrame);
+
+        } catch (err) {
+            setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
+            setSearchedTicker('');
+        } finally {
+            setLoading(false);
+        }
+        try {
+            // Fetch stock data (your existing code)
+            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
+            if (!stockResponse.ok) {
+                const errorData = await stockResponse.json();
+                throw new Error(errorData.error || 'Stock data not found');
             }
-            const chartJson = await chartResponse.json();
-            setChartData(chartJson);
+            const stockJson = await stockResponse.json();
+            setStockData(stockJson);
 
+            // Fetch prediction data
+            const predictionResponse = await fetch(`http://127.0.0.1:5001/predict/${ticker}`);
+            if (!predictionResponse.ok) {
+                const errorData = await predictionResponse.json();
+                throw new Error(errorData.error || 'Prediction not found');
+            }
+            const predictionJson = await predictionResponse.json();
+            setPredictionData(predictionJson);
+
+        // Existing chart fetch...
         } catch (err) {
             setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
         } finally {
             setLoading(false);
         }
+
     };
 
-    // --- THIS FUNCTION IS NEW ---
+    const handleTimeFrameChange = (timeFrame) => {
+        setActiveTimeFrame(timeFrame);
+        if (searchedTicker) {
+            fetchChartData(searchedTicker, timeFrame);
+        }
+    };
+
     const handleAddToWatchlist = async (tickerToAdd) => {
         try {
             const response = await fetch(`http://127.0.0.1:5001/watchlist/${tickerToAdd}`, {
@@ -118,14 +178,21 @@ const SearchPage = () => {
                 </form>
             </div>
             <div className="w-full max-w-4xl mt-4">
-                {error && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
-                {/* --- THIS LINE IS UPDATED --- */}
+                {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
-                {chartData && <StockChart chartData={chartData} />}
+                {predictionData && !chartLoading && <StockPredictionCard data={predictionData} />}
+                {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
+                {chartData && !chartLoading && (
+                    <StockChart
+                        chartData={chartData}
+                        ticker={searchedTicker}
+                        onTimeFrameChange={handleTimeFrameChange}
+                    />
+                )}
             </div>
+
         </div>
     );
 };
 
 export default SearchPage;
-
