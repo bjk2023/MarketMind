@@ -97,16 +97,23 @@ def predict_stock(ticker):
         # Predict today's closing price
         current_df = estimate_week(df)
         prediction_df = current_df.tail(6)
+        
+        # Get the most recent actual close price (not NaN)
+        recent_close_df = df[df["Close"].notna()].tail(1)
+        recent_close = recent_close_df["Close"].iloc[0] if not recent_close_df.empty else 0
+        recent_date = recent_close_df.index[0] if not recent_close_df.empty else current_df.index[0]
+        
+        # Get the first prediction
+        recent_predicted = current_df["Predicted"].iloc[0]
 
         response = {
             "symbol": info.get('symbol', ticker.upper()),
             "companyName": info.get('longName', 'N/A'),
-            "symbol": ticker.upper(),
-            "recentDate": current_df.index[0].strftime('%Y-%m-%d'),
-            "recentClose": round(current_df["Close"].iloc[0], 2),
-            "recentPredicted": round(current_df["Predicted"].iloc[0], 2),
+            "recentDate": recent_date.strftime('%Y-%m-%d'),
+            "recentClose": round(float(recent_close), 2),
+            "recentPredicted": round(float(recent_predicted), 2),
             "predictions": [
-                {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(pred, 2)}
+                {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(float(pred), 2)}
                 for date, pred in zip(prediction_df.index, prediction_df["Predicted"])
             ]
         }
