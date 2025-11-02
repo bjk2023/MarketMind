@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
 import StockChart from './charts/StockChart';
 import StockDataCard from './ui/StockDataCard';
-import StockPredictionCard from './ui/StockPredictionCard';
 import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -52,7 +51,6 @@ const SearchPage = () => {
     const [loading, setLoading] = useState(false);
     const [chartLoading, setChartLoading] = useState(false);
     const [error, setError] = useState('');
-    const [predictionData, setPredictionData] = useState(null);
 
 
     const fetchChartData = async (symbol, timeFrame) => {
@@ -101,31 +99,6 @@ const SearchPage = () => {
         } catch (err) {
             setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
             setSearchedTicker('');
-        } finally {
-            setLoading(false);
-        }
-        try {
-            // Fetch stock data (your existing code)
-            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
-            if (!stockResponse.ok) {
-                const errorData = await stockResponse.json();
-                throw new Error(errorData.error || 'Stock data not found');
-            }
-            const stockJson = await stockResponse.json();
-            setStockData(stockJson);
-
-            // Fetch prediction data
-            const predictionResponse = await fetch(`http://127.0.0.1:5001/predict/${ticker}`);
-            if (!predictionResponse.ok) {
-                const errorData = await predictionResponse.json();
-                throw new Error(errorData.error || 'Prediction not found');
-            }
-            const predictionJson = await predictionResponse.json();
-            setPredictionData(predictionJson);
-
-        // Existing chart fetch...
-        } catch (err) {
-            setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
         } finally {
             setLoading(false);
         }
@@ -180,7 +153,6 @@ const SearchPage = () => {
             <div className="w-full max-w-4xl mt-4">
                 {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
-                {predictionData && !chartLoading && <StockPredictionCard data={predictionData} />}
                 {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
                 {chartData && !chartLoading && (
                     <StockChart
