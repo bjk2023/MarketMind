@@ -5,6 +5,7 @@ import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from model import create_dataset, estimate_week, try_today, estimate_new, good_model
+from news_fetcher import get_general_news
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -257,6 +258,19 @@ def sell_stock():
     paper_portfolio["cash"] += proceeds
 
     return jsonify({"message": f"Sold {shares} {ticker} at ${price:.2f}"}), 200
+
+# --- News Endpoint ---
+
+@app.route('/api/news', methods=['GET'])
+def news_api():
+    """
+    API endpoint to fetch general market news.
+    """
+    try:
+        articles = get_general_news()
+        return jsonify(articles)
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch news: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
