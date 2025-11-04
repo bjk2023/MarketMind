@@ -84,7 +84,8 @@ def remove_from_watchlist(ticker):
     return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
 
 # --- Stock Data Endpoints ---
-# --- Replace your get_stock_data function with this ---
+# In api.py, replace your old get_stock_data function with this:
+
 @app.route('/stock/<string:ticker>')
 def get_stock_data(ticker):
     try:
@@ -107,14 +108,14 @@ def get_stock_data(ticker):
         elif market_cap_int > 0:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000:.2f}B"
         
-        # --- NEW: Get Analyst Ratings (More Reliable Source) ---
+        # --- Analyst Ratings ---
         analyst_ratings = {
             "recommendationKey": info.get('recommendationKey'),
             "targetMeanPrice": clean_value(info.get('targetMeanPrice')),
             "numberOfAnalystOpinions": clean_value(info.get('numberOfAnalystOpinions'))
         }
             
-        # --- NEW: Get Key Metrics ---
+        # --- Key Metrics ---
         key_metrics = {
             "beta": clean_value(info.get('beta')),
             "forwardPE": clean_value(info.get('forwardPE')),
@@ -122,6 +123,16 @@ def get_stock_data(ticker):
             "priceToBook": clean_value(info.get('priceToBook')),
             "pegRatio": clean_value(info.get('pegRatio'))
         }
+
+        # --- NEW: Get 7-Day Sparkline Data ---
+        sparkline = []
+        try:
+            hist = stock.history(period="7d", interval="1d")
+            if not hist.empty:
+                # Send just a simple list of closing prices
+                sparkline = [clean_value(price) for price in hist['Close']]
+        except Exception as e:
+            print(f"Could not fetch sparkline data: {e}")
 
         # --- Get Latest Financials ---
         financials = {}
@@ -148,10 +159,11 @@ def get_stock_data(ticker):
             "peRatio": clean_value(info.get('trailingPE')),
             "week52High": clean_value(info.get('fiftyTwoWeekHigh')),
             "week52Low": clean_value(info.get('fiftyTwoWeekLow')),
-            "overview": info.get('longBusinessSummary'), # We'll send the full text
-            "analystRatings": analyst_ratings,         # NEW data structure
-            "keyMetrics": key_metrics,                 # NEW data
-            "financials": financials
+            "overview": info.get('longBusinessSummary'),
+            "analystRatings": analyst_ratings,
+            "keyMetrics": key_metrics,
+            "financials": financials,
+            "sparkline": sparkline  # <-- NEWLY ADDED
         }
         return jsonify(formatted_data)
 

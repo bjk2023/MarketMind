@@ -56,7 +56,7 @@ const formatNum = (num, isPercent = false) => {
     return val.toFixed(2);
 };
 
-const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) => {
+export const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFrame }) => {
     // ... (This component is unchanged)
     const [chartType, setChartType] = useState('line');
 
