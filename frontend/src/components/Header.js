@@ -31,6 +31,7 @@ const Header = ({ activePage, setActivePage }) => {
                     <div className="flex items-center space-x-2 bg-gray-900 dark:bg-gray-800 rounded-lg p-1">
                         <NavButton pageName="search">Search</NavButton>
                         <NavButton pageName="predictions">Predictions</NavButton>
+                        <NavButton pageName="performance">Performance</NavButton>
                         <NavButton pageName="watchlist">Watchlist</NavButton>
                         <NavButton pageName="news">News</NavButton>
                         <NavButton pageName="gettingStarted">Getting Started</NavButton>

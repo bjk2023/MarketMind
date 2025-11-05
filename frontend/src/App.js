@@ -6,6 +6,7 @@ import NewsPage from './components/NewsPage';
 import GettingStartedPage from './components/GettingStartedPage';
 // NEW: Import the WatchlistPage component
 import WatchlistPage from './components/WatchlistPage';
+import ModelPerformancePage from './components/ModelPerformancePage';
 
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}
                 {activePage === 'watchlist' && <WatchlistPage />}
+                {activePage === 'performance' && <ModelPerformancePage />}
             </main>
         </div>
     );

@@ -227,7 +227,7 @@ def rolling_window_backtest(ticker, test_days=60, retrain_frequency=5):
             'days': len(dates)
         },
         'dates': [d.strftime('%Y-%m-%d') for d in dates],
-        'actuals': actuals,
+        'actuals': [float(a) for a in actuals],
         'models': {}
     }
     
@@ -252,7 +252,7 @@ def rolling_window_backtest(ticker, test_days=60, retrain_frequency=5):
             dir_acc = 0
         
         results['models'][model_name] = {
-            'predictions': preds,
+            'predictions': [float(p) for p in preds],
             'metrics': {
                 'mae': round(float(mae), 2),
                 'rmse': round(float(rmse), 2),
