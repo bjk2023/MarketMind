@@ -11,6 +11,7 @@ from news_fetcher import get_general_news
 from ensemble_model import ensemble_predict, calculate_metrics
 from evaluation import compare_models, backtest_model
 from simple_evaluation import simple_backtest
+from professional_evaluation import rolling_window_backtest
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -348,14 +349,17 @@ def news_api():
 @app.route('/evaluate/<string:ticker>')
 def evaluate_models(ticker):
     """
-    Evaluate model on historical data using simple backtesting
-    Returns metrics, predictions vs actuals, and cumulative returns
+    Professional-grade evaluation with rolling window backtesting
+    
+    Uses 42 fixed features, multiple ML models, and comprehensive metrics
+    Returns predictions vs actuals, all metrics, and trading performance
     """
     try:
-        days_back = int(request.args.get('days_back', 30))
+        test_days = int(request.args.get('test_days', 60))
+        retrain_frequency = int(request.args.get('retrain_frequency', 5))
         
-        print(f"Evaluating model for {ticker} over {days_back} days...")
-        result = simple_backtest(ticker, days_back=days_back)
+        print(f"Running professional evaluation for {ticker}...")
+        result = rolling_window_backtest(ticker, test_days=test_days, retrain_frequency=retrain_frequency)
         
         if result is None:
             return jsonify({"error": "Insufficient data for evaluation"}), 404
