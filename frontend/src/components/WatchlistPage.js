@@ -4,10 +4,10 @@ import React, { useState, useEffect } from 'react';
 const WatchlistRow = ({ stock, onRemove }) => {
     const isPositive = stock.change >= 0;
     return (
-        <tr className="border-b border-gray-200 hover:bg-gray-50">
-            <td className="py-3 px-4 font-bold text-gray-800">{stock.symbol}</td>
-            <td className="py-3 px-4 text-gray-600">{stock.companyName}</td>
-            <td className="py-3 px-4 font-medium">${stock.price.toFixed(2)}</td>
+        <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750">
+            <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">{stock.symbol}</td>
+            <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{stock.companyName}</td>
+            <td className="py-3 px-4 font-medium dark:text-gray-200">${stock.price.toFixed(2)}</td>
             <td className={`py-3 px-4 font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                 {isPositive ? '+' : ''}{stock.change.toFixed(2)} ({stock.changePercent.toFixed(2)}%)
             </td>
@@ -78,22 +78,22 @@ const WatchlistPage = () => {
         fetchWatchlistData();
     }, []);
 
-    if (loading) return <div className="text-center p-8">Loading watchlist...</div>;
-    if (error) return <div className="text-center p-8 text-red-500">{error}</div>;
+    if (loading) return <div className="text-center p-8 text-gray-600 dark:text-gray-400">Loading watchlist...</div>;
+    if (error) return <div className="text-center p-8 text-red-500 dark:text-red-400">{error}</div>;
 
     return (
         <div className="container mx-auto p-4 md:p-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">My Watchlist</h1>
+            <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-6">My Watchlist</h1>
             {watchlistData.length > 0 ? (
-                <div className="bg-white shadow-md rounded-lg overflow-x-auto">
+                <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-x-auto">
                     <table className="min-w-full text-left text-sm">
-                        <thead className="bg-gray-100 border-b border-gray-300">
+                        <thead className="bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600">
                             <tr>
-                                <th className="py-3 px-4 font-semibold text-gray-600">Symbol</th>
-                                <th className="py-3 px-4 font-semibold text-gray-600">Company</th>
-                                <th className="py-3 px-4 font-semibold text-gray-600">Price</th>
-                                <th className="py-3 px-4 font-semibold text-gray-600">Change</th>
-                                <th className="py-3 px-4 font-semibold text-gray-600">Actions</th>
+                                <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">Symbol</th>
+                                <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">Company</th>
+                                <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">Price</th>
+                                <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">Change</th>
+                                <th className="py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -104,7 +104,7 @@ const WatchlistPage = () => {
                     </table>
                 </div>
             ) : (
-                <p className="text-center text-gray-500 mt-8">Your watchlist is empty. Add stocks from the Search page.</p>
+                <p className="text-center text-gray-500 dark:text-gray-400 mt-8">Your watchlist is empty. Add stocks from the Search page.</p>
             )}
         </div>
     );

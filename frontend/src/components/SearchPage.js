@@ -128,8 +128,8 @@ const SearchPage = () => {
     return (
         <div className="container mx-auto px-4 py-16 flex flex-col items-center">
             <div className="w-full max-w-2xl text-center">
-                <h1 className="text-5xl font-extrabold text-gray-800">Stock Ticker Search</h1>
-                <p className="text-lg text-gray-500 mt-3">Enter a stock symbol to get the latest data.</p>
+                <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white">Stock Ticker Search</h1>
+                <p className="text-lg text-gray-500 dark:text-gray-400 mt-3">Enter a stock symbol to get the latest data.</p>
                 <form onSubmit={handleSearch} className="mt-8 flex relative">
                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
                         <SearchIcon />
@@ -139,7 +139,7 @@ const SearchPage = () => {
                         value={ticker}
                         onChange={(e) => setTicker(e.target.value.toUpperCase())}
                         placeholder="e.g., AAPL"
-                        className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                        className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
                     />
                     <button
                         type="submit"
@@ -151,9 +151,9 @@ const SearchPage = () => {
                 </form>
             </div>
             <div className="w-full max-w-4xl mt-4">
-                {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 rounded-lg">{error}</div>}
+                {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg">{error}</div>}
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
-                {chartLoading && <div className="text-center p-8 text-gray-500">Loading chart...</div>}
+                {chartLoading && <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading chart...</div>}
                 {chartData && !chartLoading && (
                     <StockChart
                         chartData={chartData}

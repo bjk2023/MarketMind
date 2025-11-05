@@ -6,18 +6,18 @@ const StockDataCard = ({ data, onAddToWatchlist }) => {
     const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
 
     const DataRow = ({ label, value }) => (
-        <div className="flex justify-between py-3 border-b border-gray-200 last:border-b-0">
-            <span className="text-sm text-gray-500">{label}</span>
-            <span className="text-sm font-medium text-gray-800">{value}</span>
+        <div className="flex justify-between py-3 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+            <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
+            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{value}</span>
         </div>
     );
 
     return (
-        <div className="mt-8 bg-white p-6 rounded-xl shadow-lg animate-fade-in">
+        <div className="mt-8 bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg animate-fade-in transition-colors duration-200">
             <div className="flex justify-between items-start">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">{data.companyName} ({data.symbol})</h2>
-                    <p className="text-3xl font-bold text-gray-800 mt-2">${data.price.toFixed(2)}</p>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{data.companyName} ({data.symbol})</h2>
+                    <p className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-2">${data.price.toFixed(2)}</p>
                 </div>
                 <div className="text-right">
                     <div className={`flex items-center justify-end text-lg font-semibold ${changeColor}`}>

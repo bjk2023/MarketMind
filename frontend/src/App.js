@@ -13,7 +13,7 @@ function App() {
     const [activePage, setActivePage] = useState('search');
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200">
             <style>{`
                 @keyframes fade-in {
                     from { opacity: 0; transform: translateY(10px); }
