@@ -9,7 +9,7 @@ const Header = ({ activePage, setActivePage }) => {
         return (
             <button
                 onClick={() => setActivePage(pageName)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
                     isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -20,6 +20,10 @@ const Header = ({ activePage, setActivePage }) => {
         );
     };
 
+    const NavDivider = () => (
+        <div className="h-6 w-px bg-gray-700 dark:bg-gray-600 mx-1"></div>
+    );
+
     return (
         <header className="bg-gray-800 dark:bg-gray-950 text-white shadow-lg transition-colors duration-200">
             <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
@@ -27,17 +31,30 @@ const Header = ({ activePage, setActivePage }) => {
                     <h1 className="text-xl font-bold tracking-wider">MarketMind</h1>
                 </div>
                 <div className="flex items-center space-x-4">
-                    {/* Navigation Buttons */}
-                    <div className="flex items-center space-x-2 bg-gray-900 dark:bg-gray-800 rounded-lg p-1">
-                        <NavButton pageName="search">Search</NavButton>
-                        <NavButton pageName="predictions">Predictions</NavButton>
-                        <NavButton pageName="performance">Performance</NavButton>
-                        <NavButton pageName="forex">Forex</NavButton>
-                        <NavButton pageName="crypto">Crypto</NavButton>
-                        <NavButton pageName="commodities">Commodities</NavButton>
-                        <NavButton pageName="watchlist">Watchlist</NavButton>
-                        <NavButton pageName="news">News</NavButton>
-                        <NavButton pageName="gettingStarted">Getting Started</NavButton>
+                    {/* Navigation Buttons - Organized by Section */}
+                    <div className="flex items-center space-x-1 bg-gray-900 dark:bg-gray-800 rounded-lg p-1">
+                        {/* Main Actions */}
+                        <NavButton pageName="search">🔍 Search</NavButton>
+                        <NavButton pageName="watchlist">⭐ Watchlist</NavButton>
+                        
+                        <NavDivider />
+                        
+                        {/* Stock Analysis */}
+                        <NavButton pageName="predictions">📈 Predict</NavButton>
+                        <NavButton pageName="performance">🎯 Evaluate</NavButton>
+                        
+                        <NavDivider />
+                        
+                        {/* Markets */}
+                        <NavButton pageName="forex">💱 Forex</NavButton>
+                        <NavButton pageName="crypto">🪙 Crypto</NavButton>
+                        <NavButton pageName="commodities">📊 Commodities</NavButton>
+                        
+                        <NavDivider />
+                        
+                        {/* Information */}
+                        <NavButton pageName="news">📰 News</NavButton>
+                        <NavButton pageName="gettingStarted">❓ Help</NavButton>
                     </div>
                     {/* Dark Mode Toggle */}
                     <button
