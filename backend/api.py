@@ -2,10 +2,13 @@
 # pip install Flask Flask-CORS yfinance pandas
 import os
 import yfinance as yf
+import pandas as pd
+import numpy as np
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from model import create_dataset, estimate_week, try_today, estimate_new, good_model
 from news_fetcher import get_general_news
+from ensemble_model import ensemble_predict, calculate_metrics
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -123,6 +126,66 @@ def predict_stock(ticker):
     except Exception as e:
         print(f"Error predicting stock {ticker}: {e}")
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+
+
+@app.route('/predict/ensemble/<string:ticker>')
+def predict_ensemble(ticker):
+    """
+    Enhanced prediction using ensemble of multiple ML models (Linear Regression, Random Forest, XGBoost)
+    """
+    try:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        # Get more data for ML models (1 year)
+        df = create_dataset(ticker, period="1y")
+        if df.empty or len(df) < 30:
+            return jsonify({"error": "Insufficient historical data for ensemble prediction."}), 404
+        
+        # Get ensemble predictions
+        ensemble_preds, individual_preds = ensemble_predict(df, days_ahead=6)
+        
+        if ensemble_preds is None:
+            return jsonify({"error": "Ensemble prediction failed."}), 500
+        
+        # Get recent data
+        recent_close = float(df["Close"].iloc[-1])
+        recent_date = df.index[-1]
+        
+        # Generate future dates
+        future_dates = []
+        current_date = recent_date
+        for i in range(6):
+            current_date = current_date + pd.Timedelta(days=1)
+            future_dates.append(current_date)
+        
+        # Format response
+        response = {
+            "symbol": info.get('symbol', ticker.upper()),
+            "companyName": info.get('longName', 'N/A'),
+            "recentDate": recent_date.strftime('%Y-%m-%d'),
+            "recentClose": round(recent_close, 2),
+            "recentPredicted": round(float(ensemble_preds[0]), 2),
+            "predictions": [
+                {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(float(pred), 2)}
+                for date, pred in zip(future_dates, ensemble_preds)
+            ],
+            "modelBreakdown": {
+                model_name: [round(float(p), 2) for p in preds]
+                for model_name, preds in individual_preds.items()
+            },
+            "modelsUsed": list(individual_preds.keys()),
+            "ensembleMethod": "weighted_average",
+            "confidence": round(95.0 - (np.std(list(individual_preds.values())) * 2), 1) if len(individual_preds) > 1 else 85.0
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"Error in ensemble prediction for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Ensemble prediction failed: {str(e)}"}), 500
 
 
 @app.route('/chart/<string:ticker>')

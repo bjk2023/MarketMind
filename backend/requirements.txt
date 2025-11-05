@@ -4,3 +4,7 @@ yfinance
 pandas
 python-dotenv
 finnhub-python
+scikit-learn
+xgboost
+statsmodels
+numpy

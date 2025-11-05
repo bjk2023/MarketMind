@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import StockPredictionCard from './ui/StockPredictionCard';
 import PredictionChart from './charts/PredictionChart';
+import ModelComparisonCard from './ui/ModelComparisonCard';
 import { SearchIcon } from './Icons';
 
 const PredictionsPage = ({ initialTicker }) => {
@@ -8,14 +9,15 @@ const PredictionsPage = ({ initialTicker }) => {
     const [predictionData, setPredictionData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [useEnsemble, setUseEnsemble] = useState(true);
 
-    // Auto-search when initialTicker is provided
+    // Auto-search when initialTicker is provided or ensemble mode changes
     useEffect(() => {
         if (initialTicker && initialTicker.trim()) {
             setTicker(initialTicker);
             fetchPredictions(initialTicker);
         }
-    }, [initialTicker]);
+    }, [initialTicker, useEnsemble]);
 
     const fetchPredictions = async (searchTicker) => {
         setLoading(true);
@@ -23,7 +25,11 @@ const PredictionsPage = ({ initialTicker }) => {
         setPredictionData(null);
 
         try {
-            const response = await fetch(`http://localhost:5001/predict/${searchTicker.toUpperCase()}`);
+            const endpoint = useEnsemble 
+                ? `http://localhost:5001/predict/ensemble/${searchTicker.toUpperCase()}`
+                : `http://localhost:5001/predict/${searchTicker.toUpperCase()}`;
+            
+            const response = await fetch(endpoint);
             
             if (!response.ok) {
                 throw new Error('Failed to fetch prediction data');
@@ -88,6 +94,23 @@ const PredictionsPage = ({ initialTicker }) => {
                         {loading ? 'Predicting...' : 'Predict'}
                     </button>
                 </form>
+                
+                {/* Ensemble Toggle */}
+                <div className="mt-4 flex items-center justify-center">
+                    <button
+                        onClick={() => setUseEnsemble(!useEnsemble)}
+                        className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
+                            useEnsemble
+                                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                        }`}
+                    >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                        {useEnsemble ? 'Ensemble Mode (3 Models)' : 'Single Model'}
+                    </button>
+                </div>
             </div>
 
             {/* Error Message */}
@@ -126,6 +149,14 @@ const PredictionsPage = ({ initialTicker }) => {
                     </div>
 
                     <PredictionChart predictionData={predictionData} />
+
+                    {useEnsemble && predictionData.modelBreakdown && (
+                        <ModelComparisonCard 
+                            modelBreakdown={predictionData.modelBreakdown}
+                            modelsUsed={predictionData.modelsUsed}
+                            confidence={predictionData.confidence}
+                        />
+                    )}
 
                     <StockPredictionCard data={predictionData} />
 
