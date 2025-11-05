@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, ArrowLeftRight } from 'lucide-react';
+import { DollarSign, ArrowLeftRight, RefreshCw } from 'lucide-react';
 
 const ForexPage = () => {
     const [currencies, setCurrencies] = useState([]);
@@ -174,8 +174,18 @@ const ForexPage = () => {
 
                 {/* Error Message */}
                 {error && (
-                    <div className="mt-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
-                        {error}
+                    <div className="mt-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
+                        <span>{error}</span>
+                        <button
+                            onClick={() => {
+                                setError('');
+                                handleConvert();
+                            }}
+                            className="flex items-center space-x-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all text-sm"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            <span>Retry</span>
+                        </button>
                     </div>
                 )}
             </div>

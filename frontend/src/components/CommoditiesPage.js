@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, RefreshCw } from 'lucide-react';
 
 const CommoditiesPage = () => {
     const [commodities, setCommodities] = useState([]);
@@ -86,8 +86,18 @@ const CommoditiesPage = () => {
             )}
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-6 py-4 rounded-lg mb-8">
-                    {error}
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-6 py-4 rounded-lg mb-8 flex items-center justify-between">
+                    <span>{error}</span>
+                    <button
+                        onClick={() => {
+                            setError('');
+                            fetchCommodities();
+                        }}
+                        className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Retry</span>
+                    </button>
                 </div>
             )}
 
