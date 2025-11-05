@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
 import StockChart from './charts/StockChart';
 import StockDataCard from './ui/StockDataCard';
+import PredictionPreviewCard from './ui/PredictionPreviewCard';
 import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -42,7 +43,7 @@ const timeFrames = [
     { label: '1Y', value: '1y' },
 ];
 
-const SearchPage = () => {
+const SearchPage = ({ onNavigateToPredictions }) => {
     const [ticker, setTicker] = useState('');
     const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
@@ -52,6 +53,7 @@ const SearchPage = () => {
     const [chartLoading, setChartLoading] = useState(false);
     const [error, setError] = useState('');
     const [recentSearches, setRecentSearches] = useState([]);
+    const [predictionData, setPredictionData] = useState(null);
 
     // Load recent searches from localStorage on mount
     useEffect(() => {
@@ -122,6 +124,20 @@ const SearchPage = () => {
             saveRecentSearch(ticker);
 
             await fetchChartData(ticker, defaultTimeFrame);
+            
+            // Fetch prediction data
+            try {
+                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${ticker}`);
+                if (predResponse.ok) {
+                    const predJson = await predResponse.json();
+                    setPredictionData(predJson);
+                } else {
+                    setPredictionData(null);
+                }
+            } catch {
+                // Silently fail prediction fetch
+                setPredictionData(null);
+            }
 
         } catch (err) {
             setError(err.message || 'An error occurred. Try "AAPL", "GOOGL", or "TSLA".');
@@ -212,6 +228,19 @@ const SearchPage = () => {
                                             setStockData(stockJson);
                                             setSearchedTicker(recentTicker);
                                             await fetchChartData(recentTicker, defaultTimeFrame);
+                                            
+                                            // Fetch prediction data
+                                            try {
+                                                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${recentTicker}`);
+                                                if (predResponse.ok) {
+                                                    const predJson = await predResponse.json();
+                                                    setPredictionData(predJson);
+                                                } else {
+                                                    setPredictionData(null);
+                                                }
+                                            } catch {
+                                                setPredictionData(null);
+                                            }
                                         } catch (err) {
                                             setError(err.message || 'An error occurred.');
                                             setSearchedTicker('');
@@ -231,6 +260,16 @@ const SearchPage = () => {
             <div className="w-full max-w-4xl mt-4">
                 {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg">{error}</div>}
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
+                {predictionData && (
+                    <PredictionPreviewCard 
+                        predictionData={predictionData}
+                        onViewFullPredictions={() => {
+                            if (onNavigateToPredictions) {
+                                onNavigateToPredictions(searchedTicker);
+                            }
+                        }}
+                    />
+                )}
                 {chartLoading && <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading chart...</div>}
                 {chartData && !chartLoading && (
                     <StockChart

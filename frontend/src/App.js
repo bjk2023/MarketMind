@@ -11,6 +11,12 @@ import WatchlistPage from './components/WatchlistPage';
 function App() {
     // NEW: Add 'watchlist' as a possible page state
     const [activePage, setActivePage] = useState('search');
+    const [predictionTicker, setPredictionTicker] = useState('');
+
+    const handleNavigateToPredictions = (ticker) => {
+        setPredictionTicker(ticker);
+        setActivePage('predictions');
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans transition-colors duration-200">
@@ -25,8 +31,8 @@ function App() {
             <Header activePage={activePage} setActivePage={setActivePage} />
             
             <main>
-                {activePage === 'search' && <SearchPage />}
-                {activePage === 'predictions' && <PredictionsPage />}
+                {activePage === 'search' && <SearchPage onNavigateToPredictions={handleNavigateToPredictions} />}
+                {activePage === 'predictions' && <PredictionsPage initialTicker={predictionTicker} />}
                 {activePage === 'news' && <NewsPage />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}

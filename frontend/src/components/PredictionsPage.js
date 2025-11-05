@@ -1,12 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import StockPredictionCard from './ui/StockPredictionCard';
 import { SearchIcon } from './Icons';
 
-const PredictionsPage = () => {
+const PredictionsPage = ({ initialTicker }) => {
     const [ticker, setTicker] = useState('');
     const [predictionData, setPredictionData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // Auto-search when initialTicker is provided
+    useEffect(() => {
+        if (initialTicker && initialTicker.trim()) {
+            setTicker(initialTicker);
+            fetchPredictions(initialTicker);
+        }
+    }, [initialTicker]);
+
+    const fetchPredictions = async (searchTicker) => {
+        setLoading(true);
+        setError('');
+        setPredictionData(null);
+
+        try {
+            const response = await fetch(`http://localhost:5001/predict/${searchTicker.toUpperCase()}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch prediction data');
+            }
+
+            const data = await response.json();
+            setPredictionData(data);
+        } catch (err) {
+            setError(`Error: Could not fetch predictions for ${searchTicker.toUpperCase()}. Please check the ticker and try again.`);
+            console.error('Prediction fetch error:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -16,25 +46,7 @@ const PredictionsPage = () => {
             return;
         }
 
-        setLoading(true);
-        setError('');
-        setPredictionData(null);
-
-        try {
-            const response = await fetch(`http://localhost:5001/predict/${ticker.toUpperCase()}`);
-            
-            if (!response.ok) {
-                throw new Error('Failed to fetch prediction data');
-            }
-
-            const data = await response.json();
-            setPredictionData(data);
-        } catch (err) {
-            setError(`Error: Could not fetch predictions for ${ticker.toUpperCase()}. Please check the ticker and try again.`);
-            console.error('Prediction fetch error:', err);
-        } finally {
-            setLoading(false);
-        }
+        fetchPredictions(ticker);
     };
 
     return (
