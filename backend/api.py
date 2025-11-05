@@ -12,6 +12,7 @@ from ensemble_model import ensemble_predict, calculate_metrics
 from professional_evaluation import rolling_window_backtest
 from forex_fetcher import get_exchange_rate, get_currency_list
 from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
+from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -457,6 +458,53 @@ def crypto_target_currencies():
     except Exception as e:
         print(f"Crypto currencies error: {e}")
         return jsonify({"error": f"Failed to fetch currencies: {str(e)}"}), 500
+
+
+@app.route('/commodities/price/<string:commodity>')
+def commodity_price(commodity):
+    """
+    Get current price for a specific commodity
+    """
+    try:
+        interval = request.args.get('interval', 'daily')
+        data = get_commodity_price(commodity.upper(), interval)
+        
+        if data is None:
+            return jsonify({"error": "Could not fetch commodity price"}), 404
+        
+        return jsonify(data)
+    
+    except Exception as e:
+        print(f"Commodity price error: {e}")
+        return jsonify({"error": f"Failed to fetch commodity: {str(e)}"}), 500
+
+
+@app.route('/commodities/list')
+def commodities_list():
+    """
+    Get list of available commodities
+    """
+    try:
+        commodities = get_commodity_list()
+        return jsonify(commodities)
+    
+    except Exception as e:
+        print(f"Commodities list error: {e}")
+        return jsonify({"error": f"Failed to fetch commodities: {str(e)}"}), 500
+
+
+@app.route('/commodities/all')
+def commodities_all():
+    """
+    Get current prices for all commodities grouped by category
+    """
+    try:
+        commodities = get_commodities_by_category()
+        return jsonify(commodities)
+    
+    except Exception as e:
+        print(f"Commodities all error: {e}")
+        return jsonify({"error": f"Failed to fetch all commodities: {str(e)}"}), 500
 
 
 if __name__ == '__main__':

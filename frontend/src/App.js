@@ -9,6 +9,7 @@ import WatchlistPage from './components/WatchlistPage';
 import ModelPerformancePage from './components/ModelPerformancePage';
 import ForexPage from './components/ForexPage';
 import CryptoPage from './components/CryptoPage';
+import CommoditiesPage from './components/CommoditiesPage';
 
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
                 {activePage === 'predictions' && <PredictionsPage initialTicker={predictionTicker} />}
                 {activePage === 'forex' && <ForexPage />}
                 {activePage === 'crypto' && <CryptoPage />}
+                {activePage === 'commodities' && <CommoditiesPage />}
                 {activePage === 'news' && <NewsPage />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}

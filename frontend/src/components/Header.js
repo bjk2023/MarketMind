@@ -34,6 +34,7 @@ const Header = ({ activePage, setActivePage }) => {
                         <NavButton pageName="performance">Performance</NavButton>
                         <NavButton pageName="forex">Forex</NavButton>
                         <NavButton pageName="crypto">Crypto</NavButton>
+                        <NavButton pageName="commodities">Commodities</NavButton>
                         <NavButton pageName="watchlist">Watchlist</NavButton>
                         <NavButton pageName="news">News</NavButton>
                         <NavButton pageName="gettingStarted">Getting Started</NavButton>
