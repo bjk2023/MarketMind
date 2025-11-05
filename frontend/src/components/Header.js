@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TrendingUpIcon } from './Icons';
 import { useDarkMode } from '../context/DarkModeContext';
 
 const Header = ({ activePage, setActivePage }) => {
     const { isDarkMode, toggleDarkMode } = useDarkMode();
+    const [showOtherMenu, setShowOtherMenu] = useState(false);
     const NavButton = ({ pageName, children }) => {
         const isActive = activePage === pageName;
         return (
@@ -32,7 +33,7 @@ const Header = ({ activePage, setActivePage }) => {
                 </div>
                 <div className="flex items-center space-x-4">
                     {/* Navigation Buttons - Organized by Section */}
-                    <div className="flex items-center space-x-1 bg-gray-900 dark:bg-gray-800 rounded-lg p-1">
+                    <div className="flex items-center space-x-1 bg-gray-900 dark:bg-gray-800 rounded-lg p-1 relative">
                         {/* Main Actions */}
                         <NavButton pageName="search">🔍 Search</NavButton>
                         <NavButton pageName="watchlist">⭐ Watchlist</NavButton>
@@ -45,10 +46,80 @@ const Header = ({ activePage, setActivePage }) => {
                         
                         <NavDivider />
                         
-                        {/* Markets */}
-                        <NavButton pageName="forex">💱 Forex</NavButton>
-                        <NavButton pageName="crypto">🪙 Crypto</NavButton>
-                        <NavButton pageName="commodities">📊 Commodities</NavButton>
+                        {/* Other Markets Dropdown */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowOtherMenu(!showOtherMenu)}
+                                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap flex items-center space-x-1 ${
+                                    ['forex', 'crypto', 'commodities'].includes(activePage)
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                }`}
+                            >
+                                <span>🌐 Other</span>
+                                <svg 
+                                    className={`w-4 h-4 transition-transform duration-200 ${showOtherMenu ? 'rotate-180' : ''}`} 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            
+                            {/* Dropdown Menu with Slide Animation */}
+                            <div 
+                                className={`absolute top-full left-0 mt-2 bg-gray-900 dark:bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden transition-all duration-300 ease-out z-50 ${
+                                    showOtherMenu 
+                                        ? 'opacity-100 translate-y-0 max-h-48' 
+                                        : 'opacity-0 -translate-y-2 max-h-0 pointer-events-none'
+                                }`}
+                                style={{ minWidth: '180px' }}
+                            >
+                                <button
+                                    onClick={() => {
+                                        setActivePage('forex');
+                                        setShowOtherMenu(false);
+                                    }}
+                                    className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center space-x-2 ${
+                                        activePage === 'forex'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                    }`}
+                                >
+                                    <span>💱</span>
+                                    <span>Forex</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setActivePage('crypto');
+                                        setShowOtherMenu(false);
+                                    }}
+                                    className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center space-x-2 ${
+                                        activePage === 'crypto'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                    }`}
+                                >
+                                    <span>🪙</span>
+                                    <span>Crypto</span>
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setActivePage('commodities');
+                                        setShowOtherMenu(false);
+                                    }}
+                                    className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center space-x-2 ${
+                                        activePage === 'commodities'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                    }`}
+                                >
+                                    <span>📊</span>
+                                    <span>Commodities</span>
+                                </button>
+                            </div>
+                        </div>
                         
                         <NavDivider />
                         
