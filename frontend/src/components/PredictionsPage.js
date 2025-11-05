@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import StockPredictionCard from './ui/StockPredictionCard';
+import PredictionChart from './charts/PredictionChart';
 import { SearchIcon } from './Icons';
 
 const PredictionsPage = ({ initialTicker }) => {
@@ -123,6 +124,8 @@ const PredictionsPage = ({ initialTicker }) => {
                             </div>
                         </div>
                     </div>
+
+                    <PredictionChart predictionData={predictionData} />
 
                     <StockPredictionCard data={predictionData} />
 
