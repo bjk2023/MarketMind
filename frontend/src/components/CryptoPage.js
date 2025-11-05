@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Bitcoin } from 'lucide-react';
 
 const CryptoPage = () => {
     const [cryptos, setCryptos] = useState([]);
@@ -83,9 +84,12 @@ const CryptoPage = () => {
         <div className="container mx-auto px-6 py-8 max-w-6xl">
             {/* Header */}
             <div className="text-center mb-8 animate-fade-in">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                    🪙 Cryptocurrency Exchange
-                </h1>
+                <div className="flex items-center justify-center mb-2">
+                    <Bitcoin className="w-10 h-10 text-purple-600 dark:text-purple-400 mr-3" />
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                        Cryptocurrency Exchange
+                    </h1>
+                </div>
                 <p className="text-gray-600 dark:text-gray-400">
                     Real-time cryptocurrency prices powered by Alpha Vantage
                 </p>

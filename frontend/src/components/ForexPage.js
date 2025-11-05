@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DollarSign, ArrowLeftRight } from 'lucide-react';
 
 const ForexPage = () => {
     const [currencies, setCurrencies] = useState([]);
@@ -76,9 +77,12 @@ const ForexPage = () => {
         <div className="container mx-auto px-6 py-8 max-w-6xl">
             {/* Header */}
             <div className="text-center mb-8 animate-fade-in">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                    💱 Foreign Exchange (Forex)
-                </h1>
+                <div className="flex items-center justify-center mb-2">
+                    <DollarSign className="w-10 h-10 text-blue-600 dark:text-blue-400 mr-3" />
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                        Foreign Exchange (Forex)
+                    </h1>
+                </div>
                 <p className="text-gray-600 dark:text-gray-400">
                     Real-time currency exchange rates powered by Alpha Vantage
                 </p>
@@ -125,9 +129,7 @@ const ForexPage = () => {
                             className="p-3 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded-full transition-all active:scale-95"
                             aria-label="Swap currencies"
                         >
-                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
+                            <ArrowLeftRight className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                         </button>
                     </div>
 

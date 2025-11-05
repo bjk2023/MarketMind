@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BarChart3 } from 'lucide-react';
 
 const CommoditiesPage = () => {
     const [commodities, setCommodities] = useState([]);
@@ -66,9 +67,12 @@ const CommoditiesPage = () => {
         <div className="container mx-auto px-6 py-8 max-w-7xl">
             {/* Header */}
             <div className="text-center mb-8 animate-fade-in">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                    📊 Commodities Market
-                </h1>
+                <div className="flex items-center justify-center mb-2">
+                    <BarChart3 className="w-10 h-10 text-orange-600 dark:text-orange-400 mr-3" />
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                        Commodities Market
+                    </h1>
+                </div>
                 <p className="text-gray-600 dark:text-gray-400">
                     Real-time prices for energy, metals, and agricultural commodities
                 </p>
