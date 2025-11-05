@@ -11,6 +11,7 @@ from news_fetcher import get_general_news
 from ensemble_model import ensemble_predict, calculate_metrics
 from professional_evaluation import rolling_window_backtest
 from forex_fetcher import get_exchange_rate, get_currency_list
+from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -405,6 +406,56 @@ def forex_currencies():
     
     except Exception as e:
         print(f"Forex currencies error: {e}")
+        return jsonify({"error": f"Failed to fetch currencies: {str(e)}"}), 500
+
+
+@app.route('/crypto/convert')
+def crypto_convert():
+    """
+    Convert cryptocurrency to fiat currency
+    Query params: from (crypto), to (currency)
+    """
+    try:
+        from_crypto = request.args.get('from', 'BTC').upper()
+        to_currency = request.args.get('to', 'USD').upper()
+        
+        rate_data = get_crypto_exchange_rate(from_crypto, to_currency)
+        
+        if rate_data is None:
+            return jsonify({"error": "Could not fetch crypto exchange rate"}), 404
+        
+        return jsonify(rate_data)
+    
+    except Exception as e:
+        print(f"Crypto convert error: {e}")
+        return jsonify({"error": f"Conversion failed: {str(e)}"}), 500
+
+
+@app.route('/crypto/list')
+def crypto_list():
+    """
+    Get list of available cryptocurrencies
+    """
+    try:
+        cryptos = get_crypto_list()
+        return jsonify(cryptos)
+    
+    except Exception as e:
+        print(f"Crypto list error: {e}")
+        return jsonify({"error": f"Failed to fetch crypto list: {str(e)}"}), 500
+
+
+@app.route('/crypto/currencies')
+def crypto_target_currencies():
+    """
+    Get list of target currencies for crypto conversion
+    """
+    try:
+        currencies = get_target_currencies()
+        return jsonify(currencies)
+    
+    except Exception as e:
+        print(f"Crypto currencies error: {e}")
         return jsonify({"error": f"Failed to fetch currencies: {str(e)}"}), 500
 
 
