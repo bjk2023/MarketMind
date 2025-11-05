@@ -12,7 +12,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def backtest_model(ticker, model_func, model_name, days_back=30, prediction_days=7):
+def backtest_model(ticker, model_func, model_name, days_back=30, prediction_days=1):
     """
     Backtest a prediction model on historical data
     
@@ -21,49 +21,66 @@ def backtest_model(ticker, model_func, model_name, days_back=30, prediction_days
         model_func: Function that returns predictions
         model_name: Name of the model
         days_back: How many days in the past to test
-        prediction_days: How many days ahead to predict
+        prediction_days: How many days ahead to predict (simplified to 1)
     
     Returns:
         Dictionary with backtest results
     """
     try:
-        # Download historical data
-        df = yf.download(ticker, period="1y", auto_adjust=False)[['Close']].copy()
+        # Download historical data - get more data for training
+        df = yf.download(ticker, period="1y", auto_adjust=False, progress=False)[['Close']].copy()
         
-        if df.empty or len(df) < days_back + prediction_days:
+        if df.empty or len(df) < 100:  # Need sufficient history
+            print(f"Insufficient data: got {len(df)} days")
             return None
         
         predictions = []
         actuals = []
         dates = []
         
-        # Test on the last 'days_back' days
-        for i in range(days_back, 0, -prediction_days):
-            # Get data up to this point
-            test_date_idx = len(df) - i
-            train_data = df.iloc[:test_date_idx]
-            
-            if len(train_data) < 30:  # Need minimum data
-                continue
+        # Use the most recent days_back days for testing
+        # Train on everything before that
+        test_start_idx = len(df) - days_back
+        
+        if test_start_idx < 50:  # Need at least 50 days for training
+            print(f"Not enough training data: test starts at {test_start_idx}")
+            return None
+        
+        # Predict every 3 days to balance accuracy and speed
+        step_size = 3
+        for i in range(test_start_idx, len(df) - prediction_days, step_size):
+            train_data = df.iloc[:i]
             
             # Make prediction
-            if model_name == "ensemble":
-                pred, _ = model_func(train_data, days_ahead=min(prediction_days, i))
-            else:
-                pred = model_func(train_data, days_ahead=min(prediction_days, i))
-            
-            if pred is None:
+            try:
+                if model_name == "ensemble":
+                    pred, _ = model_func(train_data, days_ahead=prediction_days)
+                else:
+                    pred = model_func(train_data, days_ahead=prediction_days)
+                
+                if pred is None or len(pred) == 0:
+                    continue
+                
+                # Get actual values for the prediction period
+                end_idx = min(i + prediction_days, len(df))
+                actual_values = df.iloc[i:end_idx]['Close'].values[1:]  # Skip current day
+                
+                # Match lengths
+                min_len = min(len(pred), len(actual_values))
+                if min_len == 0:
+                    continue
+                
+                predictions.extend(pred[:min_len])
+                actuals.extend(actual_values[:min_len])
+                dates.extend(df.index[i+1:i+1+min_len])
+            except Exception as e:
+                print(f"Prediction error at iteration {i}: {e}")
                 continue
-            
-            # Get actual values
-            actual_values = df.iloc[test_date_idx:test_date_idx + len(pred)]['Close'].values
-            
-            if len(actual_values) == len(pred):
-                predictions.extend(pred)
-                actuals.extend(actual_values)
-                dates.extend(df.index[test_date_idx:test_date_idx + len(pred)])
         
-        if len(predictions) == 0:
+        print(f"Collected {len(predictions)} predictions")
+        
+        if len(predictions) < 5:  # Need at least a few predictions
+            print(f"Too few predictions: {len(predictions)}")
             return None
         
         # Calculate metrics
@@ -194,7 +211,7 @@ def compare_models(ticker, days_back=30):
     """
     try:
         # Download data once
-        df = yf.download(ticker, period="1y", auto_adjust=False)[['Close']].copy()
+        df = yf.download(ticker, period="1y", auto_adjust=False, progress=False)[['Close']].copy()
         
         if df.empty:
             return None
