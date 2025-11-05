@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
 import StockChart from './charts/StockChart';
 import StockDataCard from './ui/StockDataCard';
@@ -51,6 +51,32 @@ const SearchPage = () => {
     const [loading, setLoading] = useState(false);
     const [chartLoading, setChartLoading] = useState(false);
     const [error, setError] = useState('');
+    const [recentSearches, setRecentSearches] = useState([]);
+
+    // Load recent searches from localStorage on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('recentSearches');
+        if (saved) {
+            try {
+                setRecentSearches(JSON.parse(saved));
+            } catch (e) {
+                console.error('Failed to load recent searches:', e);
+            }
+        }
+    }, []);
+
+    // Save a search to recent searches (max 8)
+    const saveRecentSearch = (searchTicker) => {
+        const updated = [searchTicker.toUpperCase(), ...recentSearches.filter(t => t !== searchTicker.toUpperCase())].slice(0, 8);
+        setRecentSearches(updated);
+        localStorage.setItem('recentSearches', JSON.stringify(updated));
+    };
+
+    // Clear all recent searches
+    const clearRecentSearches = () => {
+        setRecentSearches([]);
+        localStorage.removeItem('recentSearches');
+    };
 
 
     const fetchChartData = async (symbol, timeFrame) => {
@@ -93,6 +119,7 @@ const SearchPage = () => {
             const stockJson = await stockResponse.json();
             setStockData(stockJson);
             setSearchedTicker(ticker);
+            saveRecentSearch(ticker);
 
             await fetchChartData(ticker, defaultTimeFrame);
 
@@ -149,6 +176,57 @@ const SearchPage = () => {
                         {loading ? '...' : 'Search'}
                     </button>
                 </form>
+                
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && (
+                    <div className="mt-6 animate-fade-in">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Recent Searches</p>
+                            <button
+                                onClick={clearRecentSearches}
+                                className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                            >
+                                Clear All
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {recentSearches.map((recentTicker) => (
+                                <button
+                                    key={recentTicker}
+                                    onClick={async () => {
+                                        setTicker(recentTicker);
+                                        // Trigger search programmatically
+                                        setLoading(true);
+                                        setStockData(null);
+                                        setChartData(null);
+                                        setError('');
+                                        const defaultTimeFrame = timeFrames.find(f => f.value === '14d');
+                                        setActiveTimeFrame(defaultTimeFrame);
+                                        try {
+                                            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${recentTicker}`);
+                                            if (!stockResponse.ok) {
+                                                const errorData = await stockResponse.json();
+                                                throw new Error(errorData.error || 'Stock data not found');
+                                            }
+                                            const stockJson = await stockResponse.json();
+                                            setStockData(stockJson);
+                                            setSearchedTicker(recentTicker);
+                                            await fetchChartData(recentTicker, defaultTimeFrame);
+                                        } catch (err) {
+                                            setError(err.message || 'An error occurred.');
+                                            setSearchedTicker('');
+                                        } finally {
+                                            setLoading(false);
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
+                                >
+                                    {recentTicker}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
             <div className="w-full max-w-4xl mt-4">
                 {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg">{error}</div>}
