@@ -10,6 +10,7 @@ import ModelPerformancePage from './components/ModelPerformancePage';
 import ForexPage from './components/ForexPage';
 import CryptoPage from './components/CryptoPage';
 import CommoditiesPage from './components/CommoditiesPage';
+import PaperTradingPage from './components/PaperTradingPage';
 
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
             <main>
                 {activePage === 'search' && <SearchPage onNavigateToPredictions={handleNavigateToPredictions} />}
                 {activePage === 'predictions' && <PredictionsPage initialTicker={predictionTicker} />}
+                {activePage === 'portfolio' && <PaperTradingPage />}
                 {activePage === 'forex' && <ForexPage />}
                 {activePage === 'crypto' && <CryptoPage />}
                 {activePage === 'commodities' && <CommoditiesPage />}

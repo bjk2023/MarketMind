@@ -247,91 +247,225 @@ def get_chart_data(ticker):
         return jsonify({"error": f"An error occurred while fetching chart data: {str(e)}"}), 500
 
 # --- Paper Trading Endpoints ---
+from datetime import datetime
 
-paper_portfolio = {
+# Enhanced paper trading data structure
+paper_trading_data = {
     "cash": 100000.0,
-    "positions": {}  # {ticker: {"shares": 0, "avg_cost": 0}}
+    "starting_cash": 100000.0,
+    "positions": {},  # {ticker: {"shares": 0, "avg_cost": 0}}
+    "trade_history": [],  # List of all trades
+    "portfolio_history": []  # Daily snapshots
 }
+
+
+def get_current_portfolio_value():
+    """Calculate total portfolio value"""
+    total = paper_trading_data["cash"]
+    for ticker, pos in paper_trading_data["positions"].items():
+        try:
+            stock = yf.Ticker(ticker)
+            price = stock.info.get('regularMarketPrice', 0)
+            if price == 0:
+                price = stock.info.get('previousClose', 0)
+            total += pos["shares"] * price
+        except:
+            pass
+    return total
 
 
 @app.route('/paper/portfolio', methods=['GET'])
 def get_paper_portfolio():
-    """Return the current state of the paper trading portfolio."""
-    data = {"cash": paper_portfolio["cash"], "positions": []}
+    """Return the current state of the paper trading portfolio with full metrics."""
+    positions_list = []
+    total_positions_value = 0
+    total_cost_basis = 0
 
-    for ticker, pos in paper_portfolio["positions"].items():
-        stock = yf.Ticker(ticker)
-        price = stock.info.get('regularMarketPrice', 0)
-        prev_close = stock.info.get('previousClose', price)
+    for ticker, pos in paper_trading_data["positions"].items():
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            price = info.get('regularMarketPrice', 0)
+            if price == 0:
+                price = info.get('previousClose', 0)
+            
+            prev_close = info.get('previousClose', price)
+            company_name = info.get('longName', ticker)
 
-        current_value = pos["shares"] * price
-        cost_basis = pos["shares"] * pos["avg_cost"]
-        daily_pl = pos["shares"] * (price - prev_close)
-        total_pl = current_value - cost_basis
+            current_value = pos["shares"] * price
+            cost_basis = pos["shares"] * pos["avg_cost"]
+            total_pl = current_value - cost_basis
+            total_pl_percent = (total_pl / cost_basis * 100) if cost_basis > 0 else 0
+            daily_pl = pos["shares"] * (price - prev_close)
+            daily_pl_percent = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
 
-        data["positions"].append({
-            "ticker": ticker,
-            "shares": pos["shares"],
-            "avg_cost": pos["avg_cost"],
-            "current_price": price,
-            "daily_pl": daily_pl,
-            "total_pl": total_pl
-        })
+            total_positions_value += current_value
+            total_cost_basis += cost_basis
 
-    return jsonify(data)
+            positions_list.append({
+                "ticker": ticker,
+                "company_name": company_name,
+                "shares": pos["shares"],
+                "avg_cost": round(pos["avg_cost"], 2),
+                "current_price": round(price, 2),
+                "current_value": round(current_value, 2),
+                "cost_basis": round(cost_basis, 2),
+                "total_pl": round(total_pl, 2),
+                "total_pl_percent": round(total_pl_percent, 2),
+                "daily_pl": round(daily_pl, 2),
+                "daily_pl_percent": round(daily_pl_percent, 2)
+            })
+        except Exception as e:
+            print(f"Error getting data for {ticker}: {e}")
+            continue
+
+    total_value = paper_trading_data["cash"] + total_positions_value
+    total_pl = total_value - paper_trading_data["starting_cash"]
+    total_return = (total_pl / paper_trading_data["starting_cash"] * 100) if paper_trading_data["starting_cash"] > 0 else 0
+
+    return jsonify({
+        "cash": round(paper_trading_data["cash"], 2),
+        "positions_value": round(total_positions_value, 2),
+        "total_value": round(total_value, 2),
+        "starting_value": paper_trading_data["starting_cash"],
+        "total_pl": round(total_pl, 2),
+        "total_return": round(total_return, 2),
+        "positions": positions_list
+    })
 
 
 @app.route('/paper/buy', methods=['POST'])
 def buy_stock():
     """Simulate buying shares in the paper trading account."""
-    data = request.get_json()
-    ticker = data.get('ticker', '').upper()
-    shares = int(data.get('shares', 0))
-    if shares <= 0:
-        return jsonify({"error": "Shares must be positive"}), 400
+    try:
+        data = request.get_json()
+        ticker = data.get('ticker', '').upper()
+        shares = float(data.get('shares', 0))
+        
+        if shares <= 0:
+            return jsonify({"error": "Shares must be positive"}), 400
 
-    stock = yf.Ticker(ticker)
-    price = stock.info.get('regularMarketPrice')
-    if price is None:
-        return jsonify({"error": f"Invalid ticker: {ticker}"}), 404
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        price = info.get('regularMarketPrice')
+        if price is None or price == 0:
+            price = info.get('previousClose', 0)
+        if price == 0:
+            return jsonify({"error": f"Could not get price for {ticker}"}), 404
 
-    total_cost = shares * price
-    if total_cost > paper_portfolio["cash"]:
-        return jsonify({"error": "Insufficient cash"}), 400
+        total_cost = shares * price
+        if total_cost > paper_trading_data["cash"]:
+            return jsonify({"error": f"Insufficient cash. Need ${total_cost:.2f}, have ${paper_trading_data['cash']:.2f}"}), 400
 
-    pos = paper_portfolio["positions"].get(ticker, {"shares": 0, "avg_cost": 0})
-    new_total_shares = pos["shares"] + shares
-    new_avg_cost = ((pos["avg_cost"] * pos["shares"]) + total_cost) / new_total_shares
+        # Update position
+        pos = paper_trading_data["positions"].get(ticker, {"shares": 0, "avg_cost": 0})
+        new_total_shares = pos["shares"] + shares
+        new_avg_cost = ((pos["avg_cost"] * pos["shares"]) + total_cost) / new_total_shares
 
-    paper_portfolio["positions"][ticker] = {"shares": new_total_shares, "avg_cost": new_avg_cost}
-    paper_portfolio["cash"] -= total_cost
+        paper_trading_data["positions"][ticker] = {"shares": new_total_shares, "avg_cost": new_avg_cost}
+        paper_trading_data["cash"] -= total_cost
 
-    return jsonify({"message": f"Bought {shares} {ticker} at ${price:.2f}"}), 200
+        # Record trade
+        trade = {
+            "type": "BUY",
+            "ticker": ticker,
+            "shares": shares,
+            "price": price,
+            "total": total_cost,
+            "timestamp": datetime.now().isoformat()
+        }
+        paper_trading_data["trade_history"].append(trade)
+
+        return jsonify({
+            "success": True,
+            "message": f"Bought {shares} shares of {ticker} at ${price:.2f}",
+            "total_cost": round(total_cost, 2),
+            "remaining_cash": round(paper_trading_data["cash"], 2)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/paper/sell', methods=['POST'])
 def sell_stock():
     """Simulate selling shares."""
-    data = request.get_json()
-    ticker = data.get('ticker', '').upper()
-    shares = int(data.get('shares', 0))
-    if shares <= 0:
-        return jsonify({"error": "Shares must be positive"}), 400
+    try:
+        data = request.get_json()
+        ticker = data.get('ticker', '').upper()
+        shares = float(data.get('shares', 0))
+        
+        if shares <= 0:
+            return jsonify({"error": "Shares must be positive"}), 400
 
-    pos = paper_portfolio["positions"].get(ticker)
-    if not pos or pos["shares"] < shares:
-        return jsonify({"error": "Not enough shares"}), 400
+        pos = paper_trading_data["positions"].get(ticker)
+        if not pos or pos["shares"] < shares:
+            available = pos["shares"] if pos else 0
+            return jsonify({"error": f"Not enough shares. You have {available}, trying to sell {shares}"}), 400
 
-    stock = yf.Ticker(ticker)
-    price = stock.info.get('regularMarketPrice', 0)
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        price = info.get('regularMarketPrice', 0)
+        if price == 0:
+            price = info.get('previousClose', 0)
+        if price == 0:
+            return jsonify({"error": f"Could not get price for {ticker}"}), 404
 
-    proceeds = shares * price
-    pos["shares"] -= shares
-    if pos["shares"] == 0:
-        del paper_portfolio["positions"][ticker]
-    paper_portfolio["cash"] += proceeds
+        proceeds = shares * price
+        profit = proceeds - (shares * pos["avg_cost"])
+        
+        # Update position
+        pos["shares"] -= shares
+        if pos["shares"] == 0:
+            del paper_trading_data["positions"][ticker]
+        
+        paper_trading_data["cash"] += proceeds
 
-    return jsonify({"message": f"Sold {shares} {ticker} at ${price:.2f}"}), 200
+        # Record trade
+        trade = {
+            "type": "SELL",
+            "ticker": ticker,
+            "shares": shares,
+            "price": price,
+            "total": proceeds,
+            "profit": profit,
+            "timestamp": datetime.now().isoformat()
+        }
+        paper_trading_data["trade_history"].append(trade)
+
+        return jsonify({
+            "success": True,
+            "message": f"Sold {shares} shares of {ticker} at ${price:.2f}",
+            "proceeds": round(proceeds, 2),
+            "profit": round(profit, 2),
+            "new_cash": round(paper_trading_data["cash"], 2)
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/paper/history', methods=['GET'])
+def get_trade_history():
+    """Get trade history"""
+    return jsonify({
+        "trades": paper_trading_data["trade_history"][-50:]  # Last 50 trades
+    })
+
+
+@app.route('/paper/reset', methods=['POST'])
+def reset_portfolio():
+    """Reset portfolio to starting state"""
+    paper_trading_data["cash"] = paper_trading_data["starting_cash"]
+    paper_trading_data["positions"] = {}
+    paper_trading_data["trade_history"] = []
+    paper_trading_data["portfolio_history"] = []
+    
+    return jsonify({
+        "success": True,
+        "message": "Portfolio reset to starting state",
+        "starting_cash": paper_trading_data["starting_cash"]
+    })
 
 # --- News Endpoint ---
 

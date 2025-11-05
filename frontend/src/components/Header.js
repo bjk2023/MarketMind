@@ -37,6 +37,7 @@ const Header = ({ activePage, setActivePage }) => {
                         {/* Main Actions */}
                         <NavButton pageName="search">🔍 Search</NavButton>
                         <NavButton pageName="watchlist">⭐ Watchlist</NavButton>
+                        <NavButton pageName="portfolio">💼 Portfolio</NavButton>
                         
                         <NavDivider />
                         
