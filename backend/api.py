@@ -10,6 +10,7 @@ from model import create_dataset, estimate_week, try_today, estimate_new, good_m
 from news_fetcher import get_general_news
 from ensemble_model import ensemble_predict, calculate_metrics
 from evaluation import compare_models, backtest_model
+from simple_evaluation import simple_backtest
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -347,19 +348,19 @@ def news_api():
 @app.route('/evaluate/<string:ticker>')
 def evaluate_models(ticker):
     """
-    Evaluate and compare all models on historical data
-    Returns metrics, backtest results, and cumulative returns
+    Evaluate model on historical data using simple backtesting
+    Returns metrics, predictions vs actuals, and cumulative returns
     """
     try:
         days_back = int(request.args.get('days_back', 30))
         
-        print(f"Evaluating models for {ticker} over {days_back} days...")
-        comparison = compare_models(ticker, days_back=days_back)
+        print(f"Evaluating model for {ticker} over {days_back} days...")
+        result = simple_backtest(ticker, days_back=days_back)
         
-        if comparison is None:
+        if result is None:
             return jsonify({"error": "Insufficient data for evaluation"}), 404
         
-        return jsonify(comparison)
+        return jsonify(result)
     
     except Exception as e:
         print(f"Evaluation error for {ticker}: {e}")

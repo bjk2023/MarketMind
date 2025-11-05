@@ -8,10 +8,18 @@ This document defines the exact data requirements for professional backtesting a
 ## 1. Historical Stock Data (Primary)
 
 ### Source
-- **Provider:** yfinance
+- **Primary Provider:** Alpha Vantage (TIME_SERIES_DAILY_ADJUSTED)
+- **Fallback Provider:** yfinance
 - **Period:** 2 years minimum (504 trading days)
 - **Granularity:** Daily
 - **Price Type:** Adjusted Close (handles splits/dividends)
+
+### Why Alpha Vantage?
+- ✅ More reliable than yfinance
+- ✅ Up to 20+ years of historical data
+- ✅ Properly adjusted for splits and dividends
+- ✅ Better data quality and consistency
+- ⚠️ Rate limit: 5 API calls per minute (free tier)
 
 ### Required Fields
 ```python
