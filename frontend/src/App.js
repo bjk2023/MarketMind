@@ -7,6 +7,7 @@ import GettingStartedPage from './components/GettingStartedPage';
 // NEW: Import the WatchlistPage component
 import WatchlistPage from './components/WatchlistPage';
 import ModelPerformancePage from './components/ModelPerformancePage';
+import ForexPage from './components/ForexPage';
 
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
             <main>
                 {activePage === 'search' && <SearchPage onNavigateToPredictions={handleNavigateToPredictions} />}
                 {activePage === 'predictions' && <PredictionsPage initialTicker={predictionTicker} />}
+                {activePage === 'forex' && <ForexPage />}
                 {activePage === 'news' && <NewsPage />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}

@@ -10,6 +10,7 @@ from model import create_dataset, estimate_week, try_today, estimate_new, good_m
 from news_fetcher import get_general_news
 from ensemble_model import ensemble_predict, calculate_metrics
 from professional_evaluation import rolling_window_backtest
+from forex_fetcher import get_exchange_rate, get_currency_list
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -369,6 +370,42 @@ def evaluate_models(ticker):
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Evaluation failed: {str(e)}"}), 500
+
+
+@app.route('/forex/convert')
+def forex_convert():
+    """
+    Convert between two currencies using real-time exchange rates
+    Query params: from_currency, to_currency
+    """
+    try:
+        from_currency = request.args.get('from', 'USD').upper()
+        to_currency = request.args.get('to', 'EUR').upper()
+        
+        rate_data = get_exchange_rate(from_currency, to_currency)
+        
+        if rate_data is None:
+            return jsonify({"error": "Could not fetch exchange rate"}), 404
+        
+        return jsonify(rate_data)
+    
+    except Exception as e:
+        print(f"Forex convert error: {e}")
+        return jsonify({"error": f"Conversion failed: {str(e)}"}), 500
+
+
+@app.route('/forex/currencies')
+def forex_currencies():
+    """
+    Get list of available currencies
+    """
+    try:
+        currencies = get_currency_list()
+        return jsonify(currencies)
+    
+    except Exception as e:
+        print(f"Forex currencies error: {e}")
+        return jsonify({"error": f"Failed to fetch currencies: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
