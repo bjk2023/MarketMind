@@ -9,6 +9,7 @@ from flask_cors import CORS
 from model import create_dataset, estimate_week, try_today, estimate_new, good_model
 from news_fetcher import get_general_news
 from ensemble_model import ensemble_predict, calculate_metrics
+from evaluation import compare_models, backtest_model
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -341,6 +342,67 @@ def news_api():
         return jsonify(articles)
     except Exception as e:
         return jsonify({"error": f"Failed to fetch news: {str(e)}"}), 500
+
+
+@app.route('/evaluate/<string:ticker>')
+def evaluate_models(ticker):
+    """
+    Evaluate and compare all models on historical data
+    Returns metrics, backtest results, and cumulative returns
+    """
+    try:
+        days_back = int(request.args.get('days_back', 30))
+        
+        print(f"Evaluating models for {ticker} over {days_back} days...")
+        comparison = compare_models(ticker, days_back=days_back)
+        
+        if comparison is None:
+            return jsonify({"error": "Insufficient data for evaluation"}), 404
+        
+        return jsonify(comparison)
+    
+    except Exception as e:
+        print(f"Evaluation error for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Evaluation failed: {str(e)}"}), 500
+
+
+@app.route('/evaluate/model/<string:model_name>/<string:ticker>')
+def evaluate_single_model(model_name, ticker):
+    """
+    Evaluate a specific model on historical data
+    """
+    try:
+        from ensemble_model import (
+            linear_regression_predict,
+            random_forest_predict,
+            xgboost_predict,
+            ensemble_predict
+        )
+        
+        model_map = {
+            'linear_regression': linear_regression_predict,
+            'random_forest': random_forest_predict,
+            'xgboost': xgboost_predict,
+            'ensemble': ensemble_predict
+        }
+        
+        if model_name not in model_map:
+            return jsonify({"error": f"Unknown model: {model_name}"}), 400
+        
+        days_back = int(request.args.get('days_back', 30))
+        result = backtest_model(ticker, model_map[model_name], model_name, days_back=days_back)
+        
+        if result is None:
+            return jsonify({"error": "Insufficient data for backtest"}), 404
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        print(f"Single model evaluation error: {e}")
+        return jsonify({"error": f"Evaluation failed: {str(e)}"}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
