@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 const WatchlistRow = ({ stock, onRemove }) => {
     const isPositive = stock.change >= 0;
     return (
-        <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750">
+        <tr className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
             <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">{stock.symbol}</td>
             <td className="py-3 px-4 text-gray-600 dark:text-gray-400">{stock.companyName}</td>
             <td className="py-3 px-4 font-medium dark:text-gray-200">${stock.price.toFixed(2)}</td>
