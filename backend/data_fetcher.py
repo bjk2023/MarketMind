@@ -35,18 +35,20 @@ def fetch_stock_data(ticker, source='alpha_vantage', outputsize='full'):
 
 def fetch_from_alpha_vantage(ticker, outputsize='full'):
     """
-    Fetch from Alpha Vantage TIME_SERIES_DAILY_ADJUSTED
+    Fetch from Alpha Vantage TIME_SERIES_DAILY (free tier)
     
     Benefits:
-    - Adjusted for splits and dividends
     - Up to 20+ years of data
     - More reliable than yfinance
     - 5 calls per minute limit (free tier)
+    
+    Note: Using TIME_SERIES_DAILY (free) instead of DAILY_ADJUSTED (premium)
+    For adjusted prices, we fall back to yfinance which auto-adjusts
     """
     try:
         url = f'https://www.alphavantage.co/query'
         params = {
-            'function': 'TIME_SERIES_DAILY_ADJUSTED',
+            'function': 'TIME_SERIES_DAILY',
             'symbol': ticker,
             'apikey': ALPHA_VANTAGE_API_KEY,
             'outputsize': outputsize,
@@ -57,6 +59,9 @@ def fetch_from_alpha_vantage(ticker, outputsize='full'):
         response = requests.get(url, params=params, timeout=30)
         data = response.json()
         
+        # Debug: print response keys
+        print(f"Response keys: {list(data.keys())}")
+        
         # Check for errors
         if 'Error Message' in data:
             print(f"Alpha Vantage error: {data['Error Message']}")
@@ -66,12 +71,20 @@ def fetch_from_alpha_vantage(ticker, outputsize='full'):
             print(f"Alpha Vantage rate limit: {data['Note']}")
             return None
         
-        if 'Time Series (Daily)' not in data:
+        # Check for both possible key names
+        time_series_key = None
+        if 'Time Series (Daily)' in data:
+            time_series_key = 'Time Series (Daily)'
+        elif 'Time Series (Daily) Adjusted' in data:
+            time_series_key = 'Time Series (Daily) Adjusted'
+        
+        if time_series_key is None:
             print(f"No time series data found for {ticker}")
+            print(f"Available keys: {list(data.keys())}")
             return None
         
         # Parse the time series data
-        time_series = data['Time Series (Daily)']
+        time_series = data[time_series_key]
         
         # Convert to DataFrame
         df = pd.DataFrame.from_dict(time_series, orient='index')
@@ -79,23 +92,20 @@ def fetch_from_alpha_vantage(ticker, outputsize='full'):
         df = df.sort_index()
         
         # Rename columns (Alpha Vantage uses numeric keys)
+        # TIME_SERIES_DAILY format (free tier, no adjusted close)
         df = df.rename(columns={
             '1. open': 'Open',
             '2. high': 'High',
             '3. low': 'Low',
             '4. close': 'Close',
-            '5. adjusted close': 'Adj Close',
-            '6. volume': 'Volume'
+            '5. volume': 'Volume'
         })
         
         # Convert to numeric
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        # Use adjusted close as the main Close
-        df['Close'] = df['Adj Close']
-        
-        print(f"✓ Fetched {len(df)} days from Alpha Vantage")
+        print(f"✓ Fetched {len(df)} days from Alpha Vantage (unadjusted)")
         return df[['Open', 'High', 'Low', 'Close', 'Volume']]
     
     except Exception as e:
@@ -129,22 +139,28 @@ def fetch_from_yfinance(ticker, period='2y'):
 
 def get_stock_data_with_fallback(ticker, min_days=300):
     """
-    Try Alpha Vantage first, fallback to yfinance if needed
+    Smart data fetcher with fallback
+    
+    Strategy:
+    1. Try yfinance first (auto-adjusted, good for ML)
+    2. If insufficient data, try Alpha Vantage for more history
     
     Returns:
         DataFrame or None
     """
-    # Try Alpha Vantage first
-    df = fetch_from_alpha_vantage(ticker, outputsize='full')
-    
-    if df is not None and len(df) >= min_days:
-        return df
-    
-    # Fallback to yfinance
-    print(f"Falling back to yfinance for {ticker}...")
+    # Try yfinance first (auto-adjusted prices, 2 years)
     df = fetch_from_yfinance(ticker, period='2y')
     
     if df is not None and len(df) >= min_days:
+        print(f"✓ Using yfinance data (adjusted prices)")
+        return df
+    
+    # Fallback to Alpha Vantage for more history
+    print(f"Trying Alpha Vantage for more historical data...")
+    df = fetch_from_alpha_vantage(ticker, outputsize='full')
+    
+    if df is not None and len(df) >= min_days:
+        print(f"⚠️  Using Alpha Vantage data (unadjusted - may affect accuracy)")
         return df
     
     return None
@@ -169,7 +185,7 @@ def validate_and_clean_data(df):
     df = df[df['Close'].notna()].copy()
     
     # 2. Forward fill other missing values
-    df = df.fillna(method='ffill')
+    df = df.ffill()
     
     # 3. Remove outliers in Close (>3 standard deviations from rolling mean)
     rolling_mean = df['Close'].rolling(window=20, min_periods=1).mean()
