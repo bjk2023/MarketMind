@@ -11,6 +11,7 @@ import ForexPage from './components/ForexPage';
 import CryptoPage from './components/CryptoPage';
 import CommoditiesPage from './components/CommoditiesPage';
 import PaperTradingPage from './components/PaperTradingPage';
+import FundamentalsPage from './components/FundamentalsPage';
 
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
                 {activePage === 'search' && <SearchPage onNavigateToPredictions={handleNavigateToPredictions} />}
                 {activePage === 'predictions' && <PredictionsPage initialTicker={predictionTicker} />}
                 {activePage === 'portfolio' && <PaperTradingPage />}
+                {activePage === 'fundamentals' && <FundamentalsPage />}
                 {activePage === 'forex' && <ForexPage />}
                 {activePage === 'crypto' && <CryptoPage />}
                 {activePage === 'commodities' && <CommoditiesPage />}

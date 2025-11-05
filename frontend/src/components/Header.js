@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Star, Briefcase, TrendingUp, Target, Globe, DollarSign, Bitcoin, BarChart3, Newspaper, HelpCircle, Sun, Moon, ChevronDown } from 'lucide-react';
+import { Search, Star, Briefcase, Building2, TrendingUp, Target, Globe, DollarSign, Bitcoin, BarChart3, Newspaper, HelpCircle, Sun, Moon, ChevronDown } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 
 const Header = ({ activePage, setActivePage }) => {
@@ -46,6 +46,10 @@ const Header = ({ activePage, setActivePage }) => {
                         <NavButton pageName="portfolio">
                             <Briefcase className="w-4 h-4 inline mr-1" />
                             Portfolio
+                        </NavButton>
+                        <NavButton pageName="fundamentals">
+                            <Building2 className="w-4 h-4 inline mr-1" />
+                            Fundamentals
                         </NavButton>
                         
                         <NavDivider />

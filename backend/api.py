@@ -4,6 +4,7 @@ import os
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from model import create_dataset, estimate_week, try_today, estimate_new, good_model
@@ -13,6 +14,9 @@ from professional_evaluation import rolling_window_backtest
 from forex_fetcher import get_exchange_rate, get_currency_list
 from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
 from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -639,6 +643,81 @@ def commodities_all():
     except Exception as e:
         print(f"Commodities all error: {e}")
         return jsonify({"error": f"Failed to fetch all commodities: {str(e)}"}), 500
+
+
+# --- Fundamentals Endpoints ---
+@app.route('/fundamentals/<string:ticker>')
+def get_fundamentals(ticker):
+    """
+    Get comprehensive fundamental data for a company using Alpha Vantage
+    """
+    try:
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            return jsonify({"error": "Alpha Vantage API key not configured"}), 500
+        
+        # Get company overview from Alpha Vantage
+        url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker.upper()}&apikey={api_key}'
+        response = requests.get(url)
+        data = response.json()
+        
+        # Check for errors or empty response
+        if not data or 'Symbol' not in data:
+            return jsonify({"error": f"No fundamental data found for {ticker}"}), 404
+        
+        # Parse and format the data
+        fundamentals = {
+            "symbol": data.get("Symbol", ticker.upper()),
+            "name": data.get("Name", "N/A"),
+            "description": data.get("Description", "N/A"),
+            "exchange": data.get("Exchange", "N/A"),
+            "currency": data.get("Currency", "USD"),
+            "country": data.get("Country", "N/A"),
+            "sector": data.get("Sector", "N/A"),
+            "industry": data.get("Industry", "N/A"),
+            
+            # Market Data
+            "market_cap": data.get("MarketCapitalization", "N/A"),
+            "pe_ratio": data.get("PERatio", "N/A"),
+            "peg_ratio": data.get("PEGRatio", "N/A"),
+            "book_value": data.get("BookValue", "N/A"),
+            "dividend_per_share": data.get("DividendPerShare", "N/A"),
+            "dividend_yield": data.get("DividendYield", "N/A"),
+            "eps": data.get("EPS", "N/A"),
+            "revenue_per_share_ttm": data.get("RevenuePerShareTTM", "N/A"),
+            "profit_margin": data.get("ProfitMargin", "N/A"),
+            "operating_margin_ttm": data.get("OperatingMarginTTM", "N/A"),
+            "return_on_assets_ttm": data.get("ReturnOnAssetsTTM", "N/A"),
+            "return_on_equity_ttm": data.get("ReturnOnEquityTTM", "N/A"),
+            "revenue_ttm": data.get("RevenueTTM", "N/A"),
+            "gross_profit_ttm": data.get("GrossProfitTTM", "N/A"),
+            "diluted_eps_ttm": data.get("DilutedEPSTTM", "N/A"),
+            "quarterly_earnings_growth_yoy": data.get("QuarterlyEarningsGrowthYOY", "N/A"),
+            "quarterly_revenue_growth_yoy": data.get("QuarterlyRevenueGrowthYOY", "N/A"),
+            "analyst_target_price": data.get("AnalystTargetPrice", "N/A"),
+            "trailing_pe": data.get("TrailingPE", "N/A"),
+            "forward_pe": data.get("ForwardPE", "N/A"),
+            "price_to_sales_ratio_ttm": data.get("PriceToSalesRatioTTM", "N/A"),
+            "price_to_book_ratio": data.get("PriceToBookRatio", "N/A"),
+            "ev_to_revenue": data.get("EVToRevenue", "N/A"),
+            "ev_to_ebitda": data.get("EVToEBITDA", "N/A"),
+            "beta": data.get("Beta", "N/A"),
+            "week_52_high": data.get("52WeekHigh", "N/A"),
+            "week_52_low": data.get("52WeekLow", "N/A"),
+            "day_50_moving_average": data.get("50DayMovingAverage", "N/A"),
+            "day_200_moving_average": data.get("200DayMovingAverage", "N/A"),
+            "shares_outstanding": data.get("SharesOutstanding", "N/A"),
+            "dividend_date": data.get("DividendDate", "N/A"),
+            "ex_dividend_date": data.get("ExDividendDate", "N/A")
+        }
+        
+        return jsonify(fundamentals)
+    
+    except Exception as e:
+        print(f"Fundamentals error for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch fundamentals: {str(e)}"}), 500
 
 
 if __name__ == '__main__':
