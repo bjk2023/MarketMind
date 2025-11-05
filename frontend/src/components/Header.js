@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUpIcon } from './Icons';
+import { Search, Star, Briefcase, TrendingUp, Target, Globe, DollarSign, Bitcoin, BarChart3, Newspaper, HelpCircle, Sun, Moon, ChevronDown } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 
 const Header = ({ activePage, setActivePage }) => {
@@ -35,15 +35,30 @@ const Header = ({ activePage, setActivePage }) => {
                     {/* Navigation Buttons - Organized by Section */}
                     <div className="flex items-center space-x-1 bg-gray-900 dark:bg-gray-800 rounded-lg p-1 relative">
                         {/* Main Actions */}
-                        <NavButton pageName="search">🔍 Search</NavButton>
-                        <NavButton pageName="watchlist">⭐ Watchlist</NavButton>
-                        <NavButton pageName="portfolio">💼 Portfolio</NavButton>
+                        <NavButton pageName="search">
+                            <Search className="w-4 h-4 inline mr-1" />
+                            Search
+                        </NavButton>
+                        <NavButton pageName="watchlist">
+                            <Star className="w-4 h-4 inline mr-1" />
+                            Watchlist
+                        </NavButton>
+                        <NavButton pageName="portfolio">
+                            <Briefcase className="w-4 h-4 inline mr-1" />
+                            Portfolio
+                        </NavButton>
                         
                         <NavDivider />
                         
                         {/* Stock Analysis */}
-                        <NavButton pageName="predictions">📈 Predict</NavButton>
-                        <NavButton pageName="performance">🎯 Evaluate</NavButton>
+                        <NavButton pageName="predictions">
+                            <TrendingUp className="w-4 h-4 inline mr-1" />
+                            Predict
+                        </NavButton>
+                        <NavButton pageName="performance">
+                            <Target className="w-4 h-4 inline mr-1" />
+                            Evaluate
+                        </NavButton>
                         
                         <NavDivider />
                         
@@ -57,15 +72,9 @@ const Header = ({ activePage, setActivePage }) => {
                                         : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                 }`}
                             >
-                                <span>🌐 Other</span>
-                                <svg 
-                                    className={`w-4 h-4 transition-transform duration-200 ${showOtherMenu ? 'rotate-180' : ''}`} 
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
+                                <Globe className="w-4 h-4" />
+                                <span>Other</span>
+                                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOtherMenu ? 'rotate-180' : ''}`} />
                             </button>
                             
                             {/* Dropdown Menu with Slide Animation */}
@@ -88,7 +97,7 @@ const Header = ({ activePage, setActivePage }) => {
                                             : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                     }`}
                                 >
-                                    <span>💱</span>
+                                    <DollarSign className="w-4 h-4" />
                                     <span>Forex</span>
                                 </button>
                                 <button
@@ -102,7 +111,7 @@ const Header = ({ activePage, setActivePage }) => {
                                             : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                     }`}
                                 >
-                                    <span>🪙</span>
+                                    <Bitcoin className="w-4 h-4" />
                                     <span>Crypto</span>
                                 </button>
                                 <button
@@ -116,7 +125,7 @@ const Header = ({ activePage, setActivePage }) => {
                                             : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                     }`}
                                 >
-                                    <span>📊</span>
+                                    <BarChart3 className="w-4 h-4" />
                                     <span>Commodities</span>
                                 </button>
                             </div>
@@ -125,8 +134,14 @@ const Header = ({ activePage, setActivePage }) => {
                         <NavDivider />
                         
                         {/* Information */}
-                        <NavButton pageName="news">📰 News</NavButton>
-                        <NavButton pageName="gettingStarted">❓ Help</NavButton>
+                        <NavButton pageName="news">
+                            <Newspaper className="w-4 h-4 inline mr-1" />
+                            News
+                        </NavButton>
+                        <NavButton pageName="gettingStarted">
+                            <HelpCircle className="w-4 h-4 inline mr-1" />
+                            Help
+                        </NavButton>
                     </div>
                     {/* Dark Mode Toggle */}
                     <button
@@ -135,15 +150,9 @@ const Header = ({ activePage, setActivePage }) => {
                         aria-label="Toggle dark mode"
                     >
                         {isDarkMode ? (
-                            // Sun Icon (Light Mode)
-                            <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                            </svg>
+                            <Sun className="w-5 h-5 text-yellow-400" />
                         ) : (
-                            // Moon Icon (Dark Mode)
-                            <svg className="w-5 h-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                            </svg>
+                            <Moon className="w-5 h-5 text-gray-300" />
                         )}
                     </button>
                 </div>

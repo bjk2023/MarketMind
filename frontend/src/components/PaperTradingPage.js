@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Briefcase, TrendingUp, RefreshCw, RotateCcw, DollarSign, TrendingDown, BarChart3 } from 'lucide-react';
 
 const PaperTradingPage = () => {
     const [portfolio, setPortfolio] = useState(null);
@@ -133,9 +134,12 @@ const PaperTradingPage = () => {
         <div className="container mx-auto px-6 py-8 max-w-7xl">
             {/* Header */}
             <div className="text-center mb-8 animate-fade-in">
-                <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                    💼 Paper Trading Portfolio
-                </h1>
+                <div className="flex items-center justify-center mb-2">
+                    <Briefcase className="w-10 h-10 text-green-600 dark:text-green-400 mr-3" />
+                    <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
+                        Paper Trading Portfolio
+                    </h1>
+                </div>
                 <p className="text-gray-600 dark:text-gray-400">
                     Practice trading with virtual money - No risk, real market prices
                 </p>
@@ -195,20 +199,22 @@ const PaperTradingPage = () => {
                     onClick={() => setShowBuyModal(true)}
                     className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all active:scale-95 flex items-center space-x-2"
                 >
-                    <span>📈</span>
+                    <TrendingUp className="w-5 h-5" />
                     <span>Buy Stock</span>
                 </button>
                 <button
                     onClick={fetchPortfolio}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all active:scale-95"
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all active:scale-95 flex items-center space-x-2"
                 >
-                    🔄 Refresh
+                    <RefreshCw className="w-5 h-5" />
+                    <span>Refresh</span>
                 </button>
                 <button
                     onClick={handleReset}
-                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all active:scale-95 ml-auto"
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all active:scale-95 ml-auto flex items-center space-x-2"
                 >
-                    Reset Portfolio
+                    <RotateCcw className="w-5 h-5" />
+                    <span>Reset Portfolio</span>
                 </button>
             </div>
 
@@ -218,7 +224,7 @@ const PaperTradingPage = () => {
                 
                 {portfolio?.positions?.length === 0 ? (
                     <div className="text-center py-12">
-                        <div className="text-6xl mb-4">📊</div>
+                        <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                         <p className="text-gray-600 dark:text-gray-400 text-lg">No positions yet</p>
                         <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">Click "Buy Stock" to start trading</p>
                     </div>
