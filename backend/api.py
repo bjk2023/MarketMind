@@ -604,8 +604,9 @@ def commodity_price(commodity):
     Get current price for a specific commodity
     """
     try:
-        interval = request.args.get('interval', 'daily')
-        data = get_commodity_price(commodity.upper(), interval)
+        # Period parameter for yfinance (1d, 5d, 1mo, etc.)
+        period = request.args.get('period', '5d')
+        data = get_commodity_price(commodity, period)
         
         if data is None:
             return jsonify({"error": "Could not fetch commodity price"}), 404

@@ -1,167 +1,178 @@
 """
-Commodities data fetcher using Alpha Vantage
-Supports oil, natural gas, metals, and agricultural commodities
+Commodities data fetcher using yfinance for commodity ETFs and futures
+Provides real-time and historical price data for major commodities
 """
-import os
-import requests
-from dotenv import load_dotenv
+import yfinance as yf
+from datetime import datetime, timedelta
 
-load_dotenv()
-
-ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
-
-
-# Commodity info with icons and categories
+# Commodity ETF/Future ticker mappings with metadata
 COMMODITIES_INFO = {
-    # Energy
-    'WTI': {
-        'name': 'WTI Crude Oil',
-        'full_name': 'West Texas Intermediate Crude Oil',
+    # Energy - Using futures tickers
+    'CL=F': {
+        'code': 'CL=F',
+        'name': 'Crude Oil',
+        'full_name': 'WTI Crude Oil Futures',
         'unit': 'USD per barrel',
         'icon': '🛢️',
         'category': 'Energy'
     },
-    'BRENT': {
-        'name': 'Brent Crude Oil',
-        'full_name': 'Brent Crude Oil',
+    'BZ=F': {
+        'code': 'BZ=F',
+        'name': 'Brent Oil',
+        'full_name': 'Brent Crude Oil Futures',
         'unit': 'USD per barrel',
         'icon': '⛽',
         'category': 'Energy'
     },
-    'NATURAL_GAS': {
+    'NG=F': {
+        'code': 'NG=F',
         'name': 'Natural Gas',
-        'full_name': 'Henry Hub Natural Gas Spot Price',
+        'full_name': 'Natural Gas Futures',
         'unit': 'USD per MMBtu',
         'icon': '🔥',
         'category': 'Energy'
     },
     
-    # Metals
-    'COPPER': {
+    # Metals - Using futures tickers
+    'GC=F': {
+        'code': 'GC=F',
+        'name': 'Gold',
+        'full_name': 'Gold Futures',
+        'unit': 'USD per troy ounce',
+        'icon': '🥇',
+        'category': 'Metals'
+    },
+    'SI=F': {
+        'code': 'SI=F',
+        'name': 'Silver',
+        'full_name': 'Silver Futures',
+        'unit': 'USD per troy ounce',
+        'icon': '🥈',
+        'category': 'Metals'
+    },
+    'HG=F': {
+        'code': 'HG=F',
         'name': 'Copper',
-        'full_name': 'Global Price of Copper',
-        'unit': 'USD per metric ton',
+        'full_name': 'Copper Futures',
+        'unit': 'USD per pound',
         'icon': '🟤',
         'category': 'Metals'
     },
-    'ALUMINUM': {
-        'name': 'Aluminum',
-        'full_name': 'Global Price of Aluminum',
-        'unit': 'USD per metric ton',
+    'PL=F': {
+        'code': 'PL=F',
+        'name': 'Platinum',
+        'full_name': 'Platinum Futures',
+        'unit': 'USD per troy ounce',
         'icon': '⚪',
         'category': 'Metals'
     },
     
-    # Agriculture
-    'WHEAT': {
+    # Agriculture - Using futures tickers
+    'ZW=F': {
+        'code': 'ZW=F',
         'name': 'Wheat',
-        'full_name': 'Global Price of Wheat',
-        'unit': 'USD per metric ton',
+        'full_name': 'Wheat Futures',
+        'unit': 'USD per bushel',
         'icon': '🌾',
         'category': 'Agriculture'
     },
-    'CORN': {
+    'ZC=F': {
+        'code': 'ZC=F',
         'name': 'Corn',
-        'full_name': 'Global Price of Corn',
-        'unit': 'USD per metric ton',
+        'full_name': 'Corn Futures',
+        'unit': 'USD per bushel',
         'icon': '🌽',
         'category': 'Agriculture'
     },
-    'COTTON': {
-        'name': 'Cotton',
-        'full_name': 'Global Price of Cotton',
-        'unit': 'USD per kilogram',
-        'icon': '🌱',
+    'KC=F': {
+        'code': 'KC=F',
+        'name': 'Coffee',
+        'full_name': 'Coffee Futures',
+        'unit': 'USD per pound',
+        'icon': '☕',
         'category': 'Agriculture'
     },
-    'SUGAR': {
+    'SB=F': {
+        'code': 'SB=F',
         'name': 'Sugar',
-        'full_name': 'Global Price of Sugar',
-        'unit': 'USD per kilogram',
+        'full_name': 'Sugar Futures',
+        'unit': 'USD per pound',
         'icon': '🍬',
         'category': 'Agriculture'
     },
-    'COFFEE': {
-        'name': 'Coffee',
-        'full_name': 'Global Price of Coffee',
-        'unit': 'USD per kilogram',
-        'icon': '☕',
+    'CT=F': {
+        'code': 'CT=F',
+        'name': 'Cotton',
+        'full_name': 'Cotton Futures',
+        'unit': 'USD per pound',
+        'icon': '🌱',
         'category': 'Agriculture'
     }
 }
 
 
-def get_commodity_price(commodity_code='WTI', interval='daily'):
+def get_commodity_price(commodity_code='CL=F', period='5d'):
     """
-    Get commodity price data from Alpha Vantage
+    Get commodity price data from yfinance
     
     Args:
-        commodity_code: Commodity symbol (e.g., 'WTI', 'BRENT', 'NATURAL_GAS')
-        interval: 'daily', 'weekly', 'monthly'
+        commodity_code: Commodity ticker (e.g., 'CL=F' for crude oil)
+        period: Time period ('1d', '5d', '1mo', '3mo', '1y')
     
     Returns:
-        Dict with commodity price data
+        Dict with commodity price data or None if error
     """
     try:
-        url = 'https://www.alphavantage.co/query'
-        params = {
-            'function': commodity_code.upper(),
-            'interval': interval,
-            'apikey': ALPHA_VANTAGE_API_KEY
-        }
-        
-        response = requests.get(url, params=params, timeout=10)
-        data = response.json()
-        
-        # Check for errors
-        if 'Error Message' in data or 'Information' in data or 'Note' in data:
-            return None
-        
-        if 'data' not in data:
-            return None
-        
         # Get commodity info
-        commodity_info = COMMODITIES_INFO.get(commodity_code.upper(), {})
+        commodity_info = COMMODITIES_INFO.get(commodity_code, {})
         
-        # Get latest price (first item in data array)
-        latest = data['data'][0] if data['data'] else None
-        
-        if not latest:
+        if not commodity_info:
             return None
         
-        # Get previous price for change calculation
-        previous = data['data'][1] if len(data['data']) > 1 else None
+        # Fetch data from yfinance
+        ticker = yf.Ticker(commodity_code)
+        hist = ticker.history(period=period)
         
-        current_price = float(latest['value'])
-        previous_price = float(previous['value']) if previous else current_price
+        if hist.empty:
+            return None
         
+        # Get current and previous prices
+        current_price = float(hist['Close'].iloc[-1])
+        previous_price = float(hist['Close'].iloc[-2]) if len(hist) > 1 else current_price
+        
+        # Calculate changes
         price_change = current_price - previous_price
         price_change_pct = ((price_change / previous_price) * 100) if previous_price != 0 else 0
         
+        # Get date
+        latest_date = hist.index[-1].strftime('%Y-%m-%d')
+        
+        # Prepare history data
+        history = [
+            {
+                'date': date.strftime('%Y-%m-%d'),
+                'value': float(row['Close'])
+            }
+            for date, row in hist.iterrows()
+        ]
+        
         return {
-            'code': commodity_code.upper(),
-            'name': commodity_info.get('name', data.get('name', commodity_code)),
-            'full_name': commodity_info.get('full_name', data.get('name', commodity_code)),
-            'category': commodity_info.get('category', 'Other'),
-            'icon': commodity_info.get('icon', '📊'),
+            'code': commodity_code,
+            'name': commodity_info['name'],
+            'full_name': commodity_info['full_name'],
+            'category': commodity_info['category'],
+            'icon': commodity_info['icon'],
             'current_price': round(current_price, 2),
             'previous_price': round(previous_price, 2),
             'price_change': round(price_change, 2),
             'price_change_percent': round(price_change_pct, 2),
-            'unit': commodity_info.get('unit', data.get('unit', 'USD')),
-            'date': latest['date'],
-            'interval': interval,
-            'history': [
-                {
-                    'date': item['date'],
-                    'value': float(item['value'])
-                }
-                for item in data['data'][:30]  # Last 30 data points
-            ]
+            'unit': commodity_info['unit'],
+            'date': latest_date,
+            'history': history
         }
     
     except Exception as e:
-        print(f"Error fetching commodity data: {e}")
+        print(f"Error fetching commodity {commodity_code}: {e}")
         return None
 
 
@@ -185,6 +196,9 @@ def get_all_commodities():
 def get_commodities_by_category():
     """
     Get commodities grouped by category
+    
+    Returns:
+        Dict with categories as keys and lists of commodities as values
     """
     commodities = get_all_commodities()
     
@@ -205,6 +219,9 @@ def get_commodities_by_category():
 def get_commodity_list():
     """
     Get list of available commodities with metadata
+    
+    Returns:
+        List of commodity info dictionaries
     """
     return [
         {
@@ -221,25 +238,31 @@ def get_commodity_list():
 
 if __name__ == "__main__":
     # Test the commodities fetcher
-    print("Testing Commodities Fetcher\n")
+    print("Testing Commodities Fetcher with yfinance\n")
     
-    # Test WTI crude oil
-    print("WTI Crude Oil:")
-    wti = get_commodity_price('WTI')
-    if wti:
-        print(f"  {wti['icon']} {wti['name']}")
-        print(f"  Current Price: ${wti['current_price']} {wti['unit']}")
-        print(f"  Change: ${wti['price_change']} ({wti['price_change_percent']}%)")
-        print(f"  Date: {wti['date']}")
+    # Test Crude Oil
+    print("Crude Oil (WTI):")
+    crude = get_commodity_price('CL=F')
+    if crude:
+        print(f"  {crude['icon']} {crude['name']}")
+        print(f"  Current Price: ${crude['current_price']} {crude['unit']}")
+        print(f"  Change: ${crude['price_change']} ({crude['price_change_percent']:+.2f}%)")
+        print(f"  Date: {crude['date']}")
+    else:
+        print("  Failed to fetch data")
     
-    print("\nBrent Crude Oil:")
-    brent = get_commodity_price('BRENT')
-    if brent:
-        print(f"  {brent['icon']} {brent['name']}")
-        print(f"  Current Price: ${brent['current_price']} {brent['unit']}")
-        print(f"  Change: ${brent['price_change']} ({brent['price_change_percent']}%)")
+    print("\nGold:")
+    gold = get_commodity_price('GC=F')
+    if gold:
+        print(f"  {gold['icon']} {gold['name']}")
+        print(f"  Current Price: ${gold['current_price']} {gold['unit']}")
+        print(f"  Change: ${gold['price_change']} ({gold['price_change_percent']:+.2f}%)")
+    else:
+        print("  Failed to fetch data")
     
     print("\nAvailable Commodities:")
     commodities = get_commodity_list()
-    for comm in commodities[:5]:
-        print(f"  {comm['icon']} {comm['name']} ({comm['category']})")
+    for comm in commodities[:6]:
+        print(f"  {comm['icon']} {comm['name']} ({comm['category']}) - {comm['code']}")
+    
+    print(f"\nTotal: {len(commodities)} commodities available")
