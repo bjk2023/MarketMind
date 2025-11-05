@@ -35,9 +35,17 @@ const CommoditiesPage = () => {
         try {
             const response = await fetch(`http://localhost:5001/commodities/price/${code}`);
             const data = await response.json();
+            
+            if (data.error) {
+                setError(`Could not load ${code} price. API rate limit may have been reached.`);
+                return;
+            }
+            
             setSelectedCommodity(data);
+            setError(''); // Clear any previous errors
         } catch (err) {
             console.error('Price fetch error:', err);
+            setError(`Failed to load commodity price for ${code}.`);
         }
     };
 
@@ -102,39 +110,39 @@ const CommoditiesPage = () => {
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Price</p>
                                 <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                                    ${selectedCommodity.current_price.toLocaleString()}
+                                    ${selectedCommodity.current_price?.toLocaleString() || '0.00'}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                    {selectedCommodity.unit}
+                                    {selectedCommodity.unit || 'USD'}
                                 </p>
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Previous Price</p>
                                 <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
-                                    ${selectedCommodity.previous_price.toLocaleString()}
+                                    ${selectedCommodity.previous_price?.toLocaleString() || '0.00'}
                                 </p>
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Change</p>
                                 <p className={`text-2xl font-bold ${
-                                    selectedCommodity.price_change >= 0 
+                                    (selectedCommodity.price_change || 0) >= 0 
                                         ? 'text-green-600 dark:text-green-400' 
                                         : 'text-red-600 dark:text-red-400'
                                 }`}>
-                                    {selectedCommodity.price_change >= 0 ? '+' : ''}${selectedCommodity.price_change}
+                                    {(selectedCommodity.price_change || 0) >= 0 ? '+' : ''}${selectedCommodity.price_change || '0.00'}
                                 </p>
                             </div>
 
                             <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">% Change</p>
                                 <p className={`text-2xl font-bold ${
-                                    selectedCommodity.price_change_percent >= 0 
+                                    (selectedCommodity.price_change_percent || 0) >= 0 
                                         ? 'text-green-600 dark:text-green-400' 
                                         : 'text-red-600 dark:text-red-400'
                                 }`}>
-                                    {selectedCommodity.price_change_percent >= 0 ? '+' : ''}{selectedCommodity.price_change_percent}%
+                                    {(selectedCommodity.price_change_percent || 0) >= 0 ? '+' : ''}{selectedCommodity.price_change_percent || '0.00'}%
                                 </p>
                             </div>
                         </div>
@@ -194,6 +202,7 @@ const CommoditiesPage = () => {
                             <li>• <strong>Metals:</strong> Industrial metals like copper and aluminum</li>
                             <li>• <strong>Agriculture:</strong> Soft commodities like wheat, corn, coffee, sugar, and cotton</li>
                             <li>• Prices are provided by Alpha Vantage and updated daily</li>
+                            <li>• <strong>Note:</strong> Alpha Vantage free tier has a limit of 25 requests per day</li>
                             <li>• This data is for informational purposes only, not financial advice</li>
                         </ul>
                     </div>
