@@ -8,7 +8,7 @@ from statsmodels.tsa.ar_model import AutoReg
 def create_dataset(ticker, period):
     try:
         data = yf.download(ticker, period=period, auto_adjust=False)
-    except yf.shared.YFPricesMissingError as e:
+    except Exception as e:
         print(f"[Warning] Could not download data for {ticker}: {e}")
         return pd.DataFrame()
     if isinstance(data.columns, pd.MultiIndex):
@@ -24,7 +24,7 @@ def try_today(df):
     
     return new_df.tail(1)
 
-def estimate_week(df):
+def estimate_this_week(df):
     today = pd.Timestamp.today().normalize()
     new_df = estimate_new(df, today - pd.Timedelta(days=1), numdays=7)
 
@@ -58,7 +58,7 @@ def estimate_new(df, startdays, numdays=1):
 
 #Evaluating the model using Mean Absolute Error (MAE)
 def good_model(df_actual, df_predicted):
-    mae = (df_actual['Close'] - df_predicted['Close']).abs().mean().item()
+    mae = (df_actual['Close'] - df_predicted['Predicted']).abs().mean().item()
     avg_daily_change = df_actual['Close'].diff().abs().mean().item()
     print("Mean Absolute Error (MAE): ", mae)
     print("Average Daily Change: ", avg_daily_change)
