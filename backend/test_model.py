@@ -38,19 +38,14 @@ def test_create_dataset(mock_download, sample_data):
 
     assert result.empty 
 
-@patch("yfinance.download")
-def test_try_today(mock_download, sample_data):
-    mock_download.return_value = sample_data
-    df = create_dataset('AAPL', '1y')
-    result = try_today(df)
+def test_try_today(sample_data):
+    result = try_today(sample_data)
 
     assert not result.empty, "Result should not be empty"
     assert 'Predicted' in result.columns, "Result should contain 'Predicted' column"
     assert len(result) == 1, "Result should contain exactly one row"
 
-@patch("yfinance.download")
-def test_estimate_this_week(mock_download, sample_data):
-    mock_download.return_value = sample_data
+def test_estimate_this_week(sample_data):
     df = sample_data
     result = estimate_this_week(df)
 
@@ -58,47 +53,35 @@ def test_estimate_this_week(mock_download, sample_data):
     assert 'Predicted' in result.columns, "Result should contain 'Predicted' column"
     assert len(result['Predicted']) == 7, "Predicted result should have exactly 7 non-NA values"
 
-@patch("yfinance.download")
-def test_estimate_new(mock_download, sample_data):
-    mock_download.return_value = sample_data
+def test_estimate_new(sample_data):
     df = sample_data
     start_date = df.index[-2]
     result = estimate_new(df, start_date, numdays=2)
 
     assert not result.empty, "Result should not be empty"
+    assert len(result) >= len(df)
     assert 'Predicted' in result.columns, "Result should contain 'Predicted' column"
-    assert len(result['Predicted'].dropna()) >= 2, "There should be at least 2 predicted values"
+    predicted_values = result["Predicted"].dropna()
+    assert len(predicted_values) == 2, "Should produce exactly 2 predictions"
 
-@patch("yfinance.download")
-def test_good_model_good(mock_download, sample_data):
-    mock_download.return_value = sample_data
-    df_actual = sample_data
+def test_good_model_good(sample_data):
+    df_predicted = estimate_new(sample_data, sample_data.index[3], numdays=12)
 
-    df_predicted = estimate_new(df_actual, df_actual.index[3], numdays=12)
-
-    print(df_actual)
-    print("_______")
-    print(df_predicted)
-
-    is_good = good_model(df_actual, df_predicted)
+    is_good = good_model(df_predicted)
     assert isinstance(is_good, bool), "The result should be a boolean value"
     assert is_good, "The model should be considered good with low MAE"
 
-@patch("yfinance.download")
-def test_good_model_bad(mock_download, messy_data):
-    mock_download.return_value = messy_data
-    df_actual = messy_data
+def test_good_model_bad(messy_data):
+    df_predicted = estimate_new(messy_data, messy_data.index[3], numdays=12)
 
-    df_predicted = estimate_new(df_actual, df_actual.index[3], numdays=12)
-
-    print(df_actual)
-    print("_______")
-    print(df_predicted)
-
-    is_good = good_model(df_actual, df_predicted)
+    is_good = good_model(df_predicted)
     assert isinstance(is_good, bool), "The result should be a boolean value"
     assert not is_good, "The model should be considered bad with high MAE"
 
 if __name__ == "__main__":
     test_create_dataset()
     test_try_today()
+    test_estimate_this_week()
+    test_estimate_new()
+    test_good_model_good()
+    test_good_model_bad()

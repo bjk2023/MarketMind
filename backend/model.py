@@ -11,8 +11,6 @@ def create_dataset(ticker, period):
     except Exception as e:
         print(f"[Warning] Could not download data for {ticker}: {e}")
         return pd.DataFrame()
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = [col[0] for col in data.columns]
     df = data[['Close']].copy()
     df.index = pd.to_datetime(df.index)
     return df
@@ -57,19 +55,11 @@ def estimate_new(df, startdays, numdays=1):
     return df
 
 #Evaluating the model using Mean Absolute Error (MAE)
-def good_model(df_actual, df_predicted):
-    mae = (df_actual['Close'] - df_predicted['Predicted']).abs().mean().item()
-    avg_daily_change = df_actual['Close'].diff().abs().mean().item()
+def good_model(df_predicted):
+    mae = (df_predicted['Close'] - df_predicted['Predicted']).abs().mean().item()
+    avg_daily_change = df_predicted['Close'].dropna().diff().abs().mean().item()
     print("Mean Absolute Error (MAE): ", mae)
     print("Average Daily Change: ", avg_daily_change)
     if mae < avg_daily_change:
         return True
     return False
-
-if __name__ == "__main__":
-    #Variables
-    tickers = ['GOOGL','AAPL', 'MSFT', 'AMZN']
-    period = '5y'
-
-    estimate_week(create_dataset('AAPL', '5y'))
-    try_today(create_dataset('AAPL', '5y'))
