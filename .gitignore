@@ -1,12 +1,8 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 frontend/node_modules/
 backend/venv/
-frontend/.pnp
-frontend/.pnp.js
 
-# build cache - THIS IS THE NEW, IMPORTANT LINE
+# build cache
 frontend/.cache/
 
 # python cache
@@ -24,4 +20,4 @@ frontend/coverage/
 *.local
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
+yarn-error.log*frontend/node_modules/
