@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, AlertTriangle } from 'lucide-react';
+import { Search, AlertTriangle } from 'lucide-react'; // Use the Lucide icon
 
 // Helper to format numbers or return 'N/A'
 const formatNum = (num, digits = 2) => {
@@ -9,8 +9,9 @@ const formatNum = (num, digits = 2) => {
 
 // --- Trade Modal Component ---
 export const TradeModal = ({ contract, tradeType, stockPrice, onClose, onConfirmTrade }) => {
-    const [quantity, setQuantity] = useState(1);
-    const [loading, setLoading] = useState(false);
+    // --- FIX 1: Start with a blank string ---
+    const [quantity, setQuantity] = useState(''); 
+   const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     if (!contract) return null;
@@ -18,21 +19,30 @@ export const TradeModal = ({ contract, tradeType, stockPrice, onClose, onConfirm
     const isBuy = tradeType === 'Buy';
     // Use 'ask' for buying, 'bid' for selling (or lastPrice if bid is 0)
     const price = isBuy ? (contract.ask || 0) : (contract.bid || 0);
-    const totalCost = ( (price || 0) * quantity * 100).toFixed(2);
-
+    // --- FIX 2: Safely parse the quantity for calculation ---
+    const totalCost = ( (price || 0) * (parseFloat(quantity) || 0) * 100).toFixed(2);
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
-        
-        if (price <= 0) {
+
+        // --- FIX 3: Validate the quantity is a real number > 0 ---
+        const numQuantity = parseInt(quantity);
+        if (isNaN(numQuantity) || numQuantity <= 0) {
+            setError('Please enter a valid quantity.');
+            setLoading(false);
+            return;
+        }
+
+       if (price <= 0) {
             setError('Cannot trade with $0.00 price. Market may be closed or illiquid.');
             setLoading(false);
             return;
         }
         
-        const success = await onConfirmTrade(contract.contractSymbol, quantity, price, isBuy);
-        
+        // Pass the validated number to the trade handler
+        const success = await onConfirmTrade(contract.contractSymbol, numQuantity, price, isBuy);
+       
         if (success) {
             onClose();
         } else {
@@ -66,8 +76,10 @@ export const TradeModal = ({ contract, tradeType, stockPrice, onClose, onConfirm
                         <input
                             type="number"
                             value={quantity}
-                            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            // --- FIX 4: Allow the input to be blank ---
+                            onChange={(e) => setQuantity(e.target.value)}
+                           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="1" // Show '1' as a hint
                             min="1"
                             step="1"
                             required
@@ -116,62 +128,35 @@ const ChainTable = ({ data, type, stockPrice, onTradeClick, ownedPositions }) =>
     const headerColor = type === 'Calls' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
     const chainContainerRef = useRef(null);
 
-    // --- ROBINHOOD-STYLE SORTING LOGIC ---
+    // --- NEW: SIMPLE DESCENDING SORT ---
     const sortedData = useMemo(() => {
         if (!data || !stockPrice) return [];
-        
-        const itm = [];
-        const otm = [];
-
-        if (type === 'Calls') {
-            data.forEach(contract => {
-                if (contract.strike < stockPrice) {
-                    itm.push(contract);
-                } else {
-                    otm.push(contract);
-                }
-            });
-            itm.sort((a, b) => b.strike - a.strike);
-            otm.sort((a, b) => a.strike - b.strike);
-            return [...itm, ...otm];
-
-        } else { // Puts
-            data.forEach(contract => {
-                if (contract.strike > stockPrice) {
-                    itm.push(contract);
-                } else {
-                    otm.push(contract);
-                }
-            });
-            itm.sort((a, b) => a.strike - b.strike);
-            otm.sort((a, b) => b.strike - a.strike);
-            return [...itm, ...otm];
-        }
-    }, [data, stockPrice, type]);
+        // Sort by strike price, highest to lowest
+        return [...data].sort((a, b) => b.strike - a.strike);
+    }, [data, stockPrice]);
     // --- END OF SORTING LOGIC ---
 
     // --- Scroll to ATM ---
     useEffect(() => {
         if (stockPrice && chainContainerRef.current && sortedData.length > 0) {
-            let atmIndex = -1;
-            if (type === 'Calls') {
-                atmIndex = sortedData.findIndex(c => c.strike >= stockPrice);
-            } else {
-                atmIndex = sortedData.findIndex(c => c.strike <= stockPrice);
-            }
+            // Find the strike closest to the stock price
+            let closestIndex = 0;
+            let minDiff = Infinity;
             
-            if (atmIndex === -1 && sortedData.length > 0) {
-                atmIndex = sortedData.length - 1;
-            }
-
-            if (atmIndex !== -1) {
-                const rowElement = chainContainerRef.current.querySelector(`[data-index="${atmIndex}"]`);
-                if (rowElement) {
-                    rowElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+            sortedData.forEach((contract, index) => {
+                const diff = Math.abs(contract.strike - stockPrice);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = index;
                 }
+            });
+
+            const rowElement = chainContainerRef.current.querySelector(`[data-index="${closestIndex}"]`);
+            if (rowElement) {
+                rowElement.scrollIntoView({ behavior: 'auto', block: 'center' });
             }
         }
-    }, [sortedData, stockPrice, type]);
+    }, [sortedData, stockPrice]);
     // --- END OF SCROLL ---
 
     return (
@@ -378,11 +363,9 @@ const OptionsPage = () => {
                     <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
                         Options Chain
                     </h1>
-                    {/* --- THIS IS THE FIX --- */}
                     <p className="text-gray-600 dark:text-gray-400">
                         Search a ticker to see available option contracts
                     </p>
-                    {/* --- END OF FIX --- */}
                 </div>
 
                 {/* Search Bar */}

@@ -1,4 +1,4 @@
-#!/Users/rickywang/Desktop/MarketMind/Marketmind/MarketMind/backend/venv/bin/python3
+#!/Users/jimmywang/Desktop/marketmind/MarketMind-1/backend/venv/bin/python3
 
 import datetime
 import os
