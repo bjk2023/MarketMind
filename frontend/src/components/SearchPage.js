@@ -1,38 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
-import StockChart from './charts/StockChart';
+import React, { useState, useEffect } from 'react'; // <-- 'useMemo' removed
+import { SearchIcon } from './Icons';
 import StockDataCard from './ui/StockDataCard';
 import PredictionPreviewCard from './ui/PredictionPreviewCard';
-import { Line, Chart } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  TimeScale,
-  Filler, // Filler is needed for gradient backgrounds
-} from 'chart.js';
-import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
-import 'chartjs-adapter-date-fns';
-
-// Register all necessary components for Chart.js
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  TimeScale,
-  Filler, // Register Filler plugin
-  CandlestickController,
-  CandlestickElement
-);
+import StockChart from './charts/StockChart'; 
 
 const timeFrames = [
     { label: '1D', value: '1d' },
@@ -54,8 +24,10 @@ const SearchPage = ({ onNavigateToPredictions }) => {
     const [error, setError] = useState('');
     const [recentSearches, setRecentSearches] = useState([]);
     const [predictionData, setPredictionData] = useState(null);
+    
+    const [compareTicker, setCompareTicker] = useState('');
+    const [comparisonData, setComparisonData] = useState(null);
 
-    // Load recent searches from localStorage on mount
     useEffect(() => {
         const saved = localStorage.getItem('recentSearches');
         if (saved) {
@@ -67,14 +39,12 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         }
     }, []);
 
-    // Save a search to recent searches (max 8)
     const saveRecentSearch = (searchTicker) => {
         const updated = [searchTicker.toUpperCase(), ...recentSearches.filter(t => t !== searchTicker.toUpperCase())].slice(0, 8);
         setRecentSearches(updated);
         localStorage.setItem('recentSearches', JSON.stringify(updated));
     };
 
-    // Clear all recent searches
     const clearRecentSearches = () => {
         setRecentSearches([]);
         localStorage.removeItem('recentSearches');
@@ -99,35 +69,34 @@ const SearchPage = ({ onNavigateToPredictions }) => {
             setChartLoading(false);
         }
     };
-
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!ticker) return;
-
+    
+    const executeSearch = async (searchTicker) => {
         setLoading(true);
         setStockData(null);
         setChartData(null);
+        setPredictionData(null);
+        setComparisonData(null); 
+        setCompareTicker('');
         setError('');
 
         const defaultTimeFrame = timeFrames.find(f => f.value === '14d');
         setActiveTimeFrame(defaultTimeFrame);
 
         try {
-            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
+            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${searchTicker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
                 throw new Error(errorData.error || 'Stock data not found');
             }
             const stockJson = await stockResponse.json();
             setStockData(stockJson);
-            setSearchedTicker(ticker);
-            saveRecentSearch(ticker);
+            setSearchedTicker(searchTicker);
+            saveRecentSearch(searchTicker);
 
-            await fetchChartData(ticker, defaultTimeFrame);
+            await fetchChartData(searchTicker, defaultTimeFrame);
             
-            // Fetch prediction data
             try {
-                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${ticker}`);
+                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${searchTicker}`);
                 if (predResponse.ok) {
                     const predJson = await predResponse.json();
                     setPredictionData(predJson);
@@ -135,7 +104,6 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                     setPredictionData(null);
                 }
             } catch {
-                // Silently fail prediction fetch
                 setPredictionData(null);
             }
 
@@ -145,13 +113,52 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         } finally {
             setLoading(false);
         }
+    };
+    
+    const handleAddComparison = async (e) => {
+        e.preventDefault();
+        if (!compareTicker || !activeTimeFrame) return;
+        
+        try {
+            const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${compareTicker}?period=${activeTimeFrame.value}`);
+            if (!chartResponse.ok) {
+                throw new Error('Comparison ticker data not found');
+            }
+            const chartJson = await chartResponse.json();
+            setComparisonData({ ticker: compareTicker.toUpperCase(), data: chartJson });
+            setCompareTicker(''); 
+        } catch (err) {
+            alert(err.message);
+        }
+    };
 
+    const handleSearch = (e) => {
+        e.preventDefault();
+        if (ticker) {
+            executeSearch(ticker);
+        }
+    };
+
+    const handleRecentSearchClick = (recentTicker) => {
+        setTicker(recentTicker);
+        executeSearch(recentTicker);
     };
 
     const handleTimeFrameChange = (timeFrame) => {
         setActiveTimeFrame(timeFrame);
         if (searchedTicker) {
             fetchChartData(searchedTicker, timeFrame);
+            if (comparisonData) {
+                (async () => {
+                    try {
+                        const chartResponse = await fetch(`http://127.0.0.1:5001/chart/${comparisonData.ticker}?period=${timeFrame.value}`);
+                        const chartJson = await chartResponse.json();
+                        setComparisonData({ ...comparisonData, data: chartJson });
+                    } catch {
+                        setComparisonData(null);
+                    }
+                })();
+            }
         }
     };
 
@@ -161,7 +168,6 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                 method: 'POST',
             });
             const result = await response.json();
-             // You can use a more sophisticated notification system later
             alert(result.message);
         } catch (err) {
             alert('Failed to add stock to watchlist. Is the server running?');
@@ -193,7 +199,6 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                     </button>
                 </form>
                 
-                {/* Recent Searches */}
                 {recentSearches.length > 0 && (
                     <div className="mt-6 animate-fade-in">
                         <div className="flex items-center justify-between mb-3">
@@ -209,45 +214,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                             {recentSearches.map((recentTicker) => (
                                 <button
                                     key={recentTicker}
-                                    onClick={async () => {
-                                        setTicker(recentTicker);
-                                        // Trigger search programmatically
-                                        setLoading(true);
-                                        setStockData(null);
-                                        setChartData(null);
-                                        setError('');
-                                        const defaultTimeFrame = timeFrames.find(f => f.value === '14d');
-                                        setActiveTimeFrame(defaultTimeFrame);
-                                        try {
-                                            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${recentTicker}`);
-                                            if (!stockResponse.ok) {
-                                                const errorData = await stockResponse.json();
-                                                throw new Error(errorData.error || 'Stock data not found');
-                                            }
-                                            const stockJson = await stockResponse.json();
-                                            setStockData(stockJson);
-                                            setSearchedTicker(recentTicker);
-                                            await fetchChartData(recentTicker, defaultTimeFrame);
-                                            
-                                            // Fetch prediction data
-                                            try {
-                                                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${recentTicker}`);
-                                                if (predResponse.ok) {
-                                                    const predJson = await predResponse.json();
-                                                    setPredictionData(predJson);
-                                                } else {
-                                                    setPredictionData(null);
-                                                }
-                                            } catch {
-                                                setPredictionData(null);
-                                            }
-                                        } catch (err) {
-                                            setError(err.message || 'An error occurred.');
-                                            setSearchedTicker('');
-                                        } finally {
-                                            setLoading(false);
-                                        }
-                                    }}
+                                    onClick={() => handleRecentSearchClick(recentTicker)}
                                     className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
                                 >
                                     {recentTicker}
@@ -259,7 +226,9 @@ const SearchPage = ({ onNavigateToPredictions }) => {
             </div>
             <div className="w-full max-w-4xl mt-4">
                 {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg">{error}</div>}
+                
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
+                
                 {predictionData && (
                     <PredictionPreviewCard 
                         predictionData={predictionData}
@@ -272,11 +241,33 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                 )}
                 {chartLoading && <div className="text-center p-8 text-gray-500 dark:text-gray-400">Loading chart...</div>}
                 {chartData && !chartLoading && (
-                    <StockChart
-                        chartData={chartData}
-                        ticker={searchedTicker}
-                        onTimeFrameChange={handleTimeFrameChange}
-                    />
+                    <div className="mt-8 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-xl shadow-lg animate-fade-in">
+                        {/* --- Comparison Input --- */}
+                        <form onSubmit={handleAddComparison} className="flex gap-2 mb-4">
+                            <input
+                                type="text"
+                                value={compareTicker}
+                                onChange={(e) => setCompareTicker(e.target.value.toUpperCase())}
+                                placeholder="Compare (e.g., MSFT)"
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            <button
+                                type="submit"
+                                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition-all"
+                            >
+                                Add
+                            </button>
+                        </form>
+                        
+                        {/* --- The Chart Component --- */}
+                        <StockChart
+                            chartData={chartData}
+                            ticker={searchedTicker}
+                            onTimeFrameChange={handleTimeFrameChange}
+                            activeTimeFrame={activeTimeFrame}
+                            comparisonData={comparisonData} // Pass comparison data
+                        />
+                    </div>
                 )}
             </div>
 

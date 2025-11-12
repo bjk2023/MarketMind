@@ -4,7 +4,6 @@ import SearchPage from './components/SearchPage';
 import PredictionsPage from './components/PredictionsPage';
 import NewsPage from './components/NewsPage';
 import GettingStartedPage from './components/GettingStartedPage';
-// NEW: Import the WatchlistPage component
 import WatchlistPage from './components/WatchlistPage';
 import ModelPerformancePage from './components/ModelPerformancePage';
 import ForexPage from './components/ForexPage';
@@ -13,9 +12,11 @@ import CommoditiesPage from './components/CommoditiesPage';
 import PaperTradingPage from './components/PaperTradingPage';
 import FundamentalsPage from './components/FundamentalsPage';
 
+// --- 1. IMPORT YOUR NEW PAGE ---
+import OptionsPage from './components/OptionsPage';
+
 
 function App() {
-    // NEW: Add 'watchlist' as a possible page state
     const [activePage, setActivePage] = useState('search');
     const [predictionTicker, setPredictionTicker] = useState('');
 
@@ -46,9 +47,11 @@ function App() {
                 {activePage === 'commodities' && <CommoditiesPage />}
                 {activePage === 'news' && <NewsPage />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
-                {/* NEW: Render the WatchlistPage when active */}
                 {activePage === 'watchlist' && <WatchlistPage />}
                 {activePage === 'performance' && <ModelPerformancePage />}
+
+                {/* --- 2. ADD THE RENDER LINE FOR THE NEW PAGE --- */}
+                {activePage === 'options' && <OptionsPage />}
             </main>
         </div>
     );

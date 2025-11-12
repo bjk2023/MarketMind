@@ -64,6 +64,13 @@ const Header = ({ activePage, setActivePage }) => {
                             Evaluate
                         </NavButton>
                         
+                        {/* --- NEW BUTTON ADDED HERE --- */}
+                        <NavButton pageName="options">
+                            <BarChart3 className="w-4 h-4 inline mr-1" />
+                            Options
+                        </NavButton>
+                        {/* --- END OF NEW BUTTON --- */}
+                        
                         <NavDivider />
                         
                         {/* Other Markets Dropdown */}
