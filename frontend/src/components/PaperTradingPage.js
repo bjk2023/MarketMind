@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, TrendingUp, RefreshCw, RotateCcw, BarChart3 } from 'lucide-react';
-// --- NEW: Import the TradeModal from OptionsPage ---
+// --- Import the TradeModal from OptionsPage ---
 import { TradeModal } from './OptionsPage';
+// --- Import the Portfolio Growth Chart (with correct path) ---
+import PortfolioGrowthChart from './charts/PortfolioGrowthChart';
 
-// --- NEW: Helper to safely format numbers ---
+
+// --- Helper to safely format numbers ---
 const formatCurrency = (val) => {
     if (val === null || val === undefined || isNaN(val)) return '$0.00';
     return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -16,8 +19,8 @@ const formatNum = (val) => {
 const PaperTradingPage = () => {
     const [portfolio, setPortfolio] = useState(null);
     const [stockPositions, setStockPositions] = useState([]); // Use this for just stock positions
-    const [optionsPositions, setOptionsPositions] = useState([]); 
-    
+    const [optionsPositions, setOptionsPositions] = useState([]);
+
     const [tradeHistory, setTradeHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showBuyModal, setShowBuyModal] = useState(false);
@@ -28,19 +31,21 @@ const PaperTradingPage = () => {
     const [sellShares, setSellShares] = useState('');
     const [tradeMessage, setTradeMessage] = useState({ type: '', text: '' });
 
-    // --- NEW: State for the Option Sell Modal ---
+    // --- State for the Option Sell Modal ---
     const [isOptionModalOpen, setIsOptionModalOpen] = useState(false);
     const [selectedOption, setSelectedOption] = useState(null);
 
     const fetchPortfolio = async () => {
         try {
             const response = await fetch('http://127.0.0.1:5001/paper/portfolio');
+            if (!response.ok) throw new Error("Portfolio fetch failed");
             const data = await response.json();
             setPortfolio(data);
             setStockPositions(data.positions || []);
-            setOptionsPositions(data.options_positions || []); 
+            setOptionsPositions(data.options_positions || []);
         } catch (err) {
             console.error('Error fetching portfolio:', err);
+            setTradeMessage({ type: 'error', text: 'Failed to fetch portfolio data.' });
         } finally {
             setLoading(false);
         }
@@ -48,11 +53,19 @@ const PaperTradingPage = () => {
 
     const fetchTradeHistory = async () => {
         try {
-            const response = await fetch('http://localhost:5001/paper/history');
+            // This endpoint in your backend (api.py) returns the transaction history
+            // from the paper_portfolio.json file.
+            // NOTE: This assumes your api.py has a /paper/transactions endpoint
+            // If you only have /paper/history, this needs to be adapted.
+            // For now, let's assume a /paper/transactions endpoint.
+            const response = await fetch('http://localhost:5001/paper/transactions');
+            if (!response.ok) throw new Error("History fetch failed");
             const data = await response.json();
-            setTradeHistory(data.trades || []);
+            setTradeHistory(data || []);
+
         } catch (err) {
             console.error('Error fetching trade history:', err);
+            // Don't set a trade message here, it's less critical
         }
     };
 
@@ -62,23 +75,24 @@ const PaperTradingPage = () => {
         fetchTradeHistory();
         const interval = setInterval(() => {
             fetchPortfolio();
-        }, 30000);
+        }, 30000); // Auto-refresh portfolio every 30 seconds
         return () => clearInterval(interval);
     }, []);
 
+    // --- Handle Stock Buy/Sell ---
     const handleBuy = async (e) => {
         e.preventDefault();
         setTradeMessage({ type: '', text: '' });
-        
+
         try {
             const response = await fetch('http://localhost:5001/paper/buy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticker: buyTicker.toUpperCase(), shares: parseFloat(buyShares) })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 setTradeMessage({ type: 'success', text: data.message });
                 setBuyTicker('');
@@ -97,16 +111,16 @@ const PaperTradingPage = () => {
     const handleSell = async (e) => {
         e.preventDefault();
         setTradeMessage({ type: '', text: '' });
-        
+
         try {
             const response = await fetch('http://localhost:5001/paper/sell', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticker: selectedStock.ticker, shares: parseFloat(sellShares) })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 setTradeMessage({ type: 'success', text: data.message });
                 setSellShares('');
@@ -122,7 +136,7 @@ const PaperTradingPage = () => {
         }
     };
 
-    // --- NEW: Function to handle selling an option from the modal ---
+    // --- Handle Option Sell ---
     const handleConfirmOptionSell = async (contractSymbol, quantity, price, isBuy) => {
         if (isBuy) return false; // We only sell from this page
 
@@ -131,8 +145,9 @@ const PaperTradingPage = () => {
             quantity: quantity,
             price: price
         });
-        
+
         try {
+            // Make sure your api.py has this endpoint: /paper/options/sell
             const response = await fetch(`http://localhost:5001/paper/options/sell`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -152,9 +167,7 @@ const PaperTradingPage = () => {
         }
     };
 
-    // --- NEW: Function to open the sell modal ---
     const handleManageOption = (optionPosition) => {
-        // We need to create a "contract" object for the modal
         const contract = {
             contractSymbol: optionPosition.ticker,
             bid: optionPosition.current_price, // Sell at the 'bid' (current price)
@@ -164,12 +177,14 @@ const PaperTradingPage = () => {
         setIsOptionModalOpen(true);
     };
 
+    // --- Handle Portfolio Reset ---
     const handleReset = async () => {
         if (!window.confirm('Are you sure you want to reset your portfolio? This will delete all positions and trade history.')) {
             return;
         }
-        
+
         try {
+            // Make sure your api.py has this endpoint: /paper/reset
             const response = await fetch('http://localhost:5001/paper/reset', {
                 method: 'POST'
             });
@@ -181,6 +196,8 @@ const PaperTradingPage = () => {
             setTradeMessage({ type: 'error', text: 'Failed to reset portfolio' });
         }
     };
+
+    // --- Render Logic ---
 
     if (loading) {
         return (
@@ -195,12 +212,12 @@ const PaperTradingPage = () => {
 
     return (
         <>
-            {/* --- NEW: Add the Option Sell Modal to the page --- */}
+            {/* Option Sell Modal */}
             {isOptionModalOpen && (
                 <TradeModal
                     contract={selectedOption}
-                    tradeType="Sell" // Hardcode to "Sell"
-                    stockPrice={null} // Not needed for selling
+                    tradeType="Sell"
+                    stockPrice={null}
                     onClose={() => setIsOptionModalOpen(false)}
                     onConfirmTrade={handleConfirmOptionSell}
                 />
@@ -220,7 +237,7 @@ const PaperTradingPage = () => {
                     </p>
                 </div>
 
-                {/* Trade Message */}
+                {/* Trade Message Notification */}
                 {tradeMessage.text && (
                     <div className={`mb-6 p-4 rounded-lg animate-fade-in ${
                         tradeMessage.type === 'success' 
@@ -231,7 +248,7 @@ const PaperTradingPage = () => {
                     </div>
                 )}
 
-                {/* --- MODIFIED: Portfolio Summary --- */}
+                {/* Portfolio Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8 animate-fade-in">
                     <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 rounded-xl p-6 border border-green-100 dark:border-green-800">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Value</p>
@@ -241,7 +258,7 @@ const PaperTradingPage = () => {
                         <p className={`text-sm mt-2 font-semibold ${
                             (portfolio?.total_pl || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                         }`}>
-                            {(portfolio?.total_pl || 0) >= 0 ? '+' : ''}{formatCurrency(portfolio?.total_pl)} 
+                            {(portfolio?.total_pl || 0) >= 0 ? '+' : ''}{formatCurrency(portfolio?.total_pl)}
                             ({(portfolio?.total_return || 0) >= 0 ? '+' : ''}{formatNum(portfolio?.total_return)}%)
                         </p>
                     </div>
@@ -260,7 +277,6 @@ const PaperTradingPage = () => {
                         </p>
                     </div>
 
-                    {/* --- NEW: Options Value Card --- */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Options Value</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -271,11 +287,16 @@ const PaperTradingPage = () => {
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Positions</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {(portfolio?.positions?.length || 0) + (optionsPositions?.length || 0)}
+                            {(stockPositions?.length || 0) + (optionsPositions?.length || 0)}
                         </p>
                     </div>
                 </div>
-                {/* --- END OF MODIFIED SUMMARY --- */}
+
+                {/* --- ADDED: PORTFOLIO GROWTH CHART --- */}
+                <div className="mb-8">
+                    <PortfolioGrowthChart />
+                </div>
+                {/* --- END OF NEW CHART --- */}
 
 
                 {/* Action Buttons */}
@@ -306,8 +327,8 @@ const PaperTradingPage = () => {
                 {/* Stock Positions */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 animate-fade-in">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Stock Positions</h2>
-                    
-                    {(!portfolio?.positions || portfolio.positions.length === 0) ? (
+
+                    {stockPositions.length === 0 ? (
                         <div className="text-center py-12">
                             <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                             <p className="text-gray-600 dark:text-gray-400 text-lg">No stock positions yet</p>
@@ -315,14 +336,14 @@ const PaperTradingPage = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            {portfolio?.positions?.map((position) => (
+                            {stockPositions.map((position) => (
                                 <div key={position.ticker} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-all">
                                     <div className="flex items-center justify-between">
                                         <div className="flex-1">
                                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{position.ticker}</h3>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">{position.company_name}</p>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-5 gap-6 flex-1 text-center">
                                             <div>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">Shares</p>
@@ -350,7 +371,7 @@ const PaperTradingPage = () => {
                                                 </p>
                                             </div>
                                         </div>
-                                        
+
                                         <button
                                             onClick={() => {
                                                 setSelectedStock(position);
@@ -366,8 +387,8 @@ const PaperTradingPage = () => {
                         </div>
                     )}
                 </div>
-                
-                {/* --- MODIFIED: Options Positions Table --- */}
+
+                {/* Options Positions Table */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 animate-fade-in">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Options Positions</h2>
                     {optionsPositions.length === 0 ? (
@@ -392,7 +413,6 @@ const PaperTradingPage = () => {
                                             <div><p className="text-xs text-gray-500 dark:text-gray-400">Value</p><p className="font-semibold text-gray-900 dark:text-white">{formatCurrency(pos.current_value)}</p></div>
                                             <div><p className="text-xs text-gray-500 dark:text-gray-400">Total P/L</p><p className={`font-semibold ${pos.total_pl >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(pos.total_pl)}</p></div>
                                         </div>
-                                        {/* --- MODIFIED: This button now works --- */}
                                         <button
                                             onClick={() => handleManageOption(pos)}
                                             className="ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all"
@@ -405,13 +425,12 @@ const PaperTradingPage = () => {
                         </div>
                     )}
                 </div>
-                {/* --- END OF NEW TABLE --- */}
 
 
                 {/* Trade History */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 animate-fade-in">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Trade History</h2>
-                    
+
                     {tradeHistory.length === 0 ? (
                         <div className="text-center py-8">
                             <p className="text-gray-600 dark:text-gray-400">No trades yet</p>
@@ -437,7 +456,6 @@ const PaperTradingPage = () => {
                                                 {new Date(trade.timestamp).toLocaleString()}
                                             </td>
                                             <td className="py-3 px-4">
-                                                {/* --- MODIFIED: Handle new trade types --- */}
                                                 <span className={`px-2 py-1 rounded text-xs font-semibold ${
                                                     trade.type.includes('BUY') 
                                                         ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'

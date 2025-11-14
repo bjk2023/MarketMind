@@ -37,7 +37,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="/Users/jimmywang/Desktop/marketmind/MarketMind-1/backend/venv"
+VIRTUAL_ENV="/Users/rickywang/Desktop/MarketMind/Marketmind/MarketMind/backend/venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
