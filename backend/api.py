@@ -8,6 +8,11 @@ from flask_cors import CORS
 from datetime import datetime, timedelta
 import sqlite3
 
+# --- DOTENV MUST BE FIRST ---
+from dotenv import load_dotenv
+load_dotenv() 
+# --- END FIX ---
+
 # --- Tazeem's Imports ---
 from model import create_dataset, estimate_week, try_today, estimate_new, good_model
 from news_fetcher import get_general_news
@@ -16,20 +21,19 @@ from professional_evaluation import rolling_window_backtest
 from forex_fetcher import get_exchange_rate, get_currency_list
 from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
 from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
-from dotenv import load_dotenv
+
+
+# --- New Imports for Options Suggester ---
 from options_suggester import generate_suggestion
-
-# --- Alpaca Imports REMOVED ---
-
-load_dotenv() 
+# Note: The options_model import is in options_suggester.py
 
 # Initialize the Flask application
 app = Flask(__name__)
 CORS(app)
 
 # --- CONFIGURATION ---
-NEWS_API_KEY = "4f2abfc0913748ee9cedf3b5e5878bcc"
-ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY') 
+NEWS_API_KEY = os.getenv('NEWS_API_KEY')
+ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY') # Now this will work
 # ALPACA KEYS REMOVED
 
 # --- Database Setup ---
@@ -72,6 +76,33 @@ def clean_value(val):
         return float(val)
     return val
 
+# --- NEW HELPER FUNCTION for Symbol Search ---
+def get_symbol_suggestions(query):
+    if not ALPHA_VANTAGE_API_KEY:
+        print("Alpha Vantage key not configured. Cannot get suggestions.")
+        return []
+        
+    try:
+        url = f'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={query}&apikey={ALPHA_VANTAGE_API_KEY}'
+        r = requests.get(url)
+        data = r.json()
+        
+        matches = data.get('bestMatches', [])
+        formatted_matches = []
+        for match in matches:
+            # Filter for US stocks
+            if "." not in match.get('1. symbol') and match.get('4. region') == "United States":
+                formatted_matches.append({
+                    "symbol": match.get('1. symbol'),
+                    "name": match.get('2. name')
+                })
+        return formatted_matches
+    except Exception as e:
+        print(f"Error in get_symbol_suggestions: {e}")
+        return []
+# --- END HELPER FUNCTION ---
+
+
 # --- In-memory storage ---
 watchlist = set()
 
@@ -101,7 +132,7 @@ def remove_from_watchlist(ticker):
     watchlist.discard(ticker)
     return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
 
-# --- Stock Data Endpoints ---
+# --- This is the REVERTED Stock Data Endpoint ---
 @app.route('/stock/<string:ticker>')
 def get_stock_data(ticker):
     try:
@@ -110,8 +141,9 @@ def get_stock_data(ticker):
         info = stock.info
         
         if info.get('regularMarketPrice') is None:
+            # This is the original behavior: just return an error
             return jsonify({"error": f"Invalid ticker symbol '{ticker}' or no data available."}), 404
-        
+
         price = info.get('regularMarketPrice', 0)
         previous_close = info.get('previousClose', price)
         change = price - previous_close
@@ -356,6 +388,25 @@ def get_option_chain(ticker):
         print(f"Error getting option chain: {e}")
         return jsonify({"error": "Could not retrieve option chain for this date."}), 404
 
+# --- Options Suggestion Endpoint ---
+@app.route('/options/suggest/<string:ticker>', methods=['GET'])
+def get_option_suggestion(ticker):
+    """
+    Generates a Call/Put suggestion based on ML, TA, and Sentiment.
+    """
+    try:
+        sanitized_ticker = ticker.split(':')[0].upper()
+        suggestion = generate_suggestion(sanitized_ticker)
+        
+        if "error" in suggestion:
+            return jsonify(suggestion), 404
+            
+        return jsonify(suggestion)
+        
+    except Exception as e:
+        print(f"Error in suggestion endpoint for {ticker}: {e}")
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
 # --- Tazeem's Endpoints (ML, Paper Trading, Other APIs) ---
 
 @app.route('/predict/<string:ticker>')
@@ -540,23 +591,6 @@ def get_paper_portfolio():
         "options_positions": options_positions_list
     })
 
-@app.route('/options/suggest/<string:ticker>', methods=['GET'])
-def get_option_suggestion(ticker):
-    """
-    Generates a Call/Put suggestion based on ML, TA, and Sentiment.
-    """
-    try:
-        sanitized_ticker = ticker.split(':')[0].upper()
-        suggestion = generate_suggestion(sanitized_ticker)
-        
-        if "error" in suggestion:
-            return jsonify(suggestion), 404
-            
-        return jsonify(suggestion)
-        
-    except Exception as e:
-        print(f"Error in suggestion endpoint for {ticker}: {e}")
-        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/paper/buy', methods=['POST'])
 def buy_stock():
@@ -889,6 +923,20 @@ def get_fundamentals(ticker):
     except Exception as e:
         print(f"Fundamentals error for {ticker}: {e}")
         return jsonify({"error": f"Failed to fetch fundamentals: {str(e)}"}), 500
+
+# --- MODIFIED SYMBOL SEARCH ENDPOINT ---
+@app.route('/search-symbols')
+def search_symbols():
+    query = request.args.get('q')
+    if not query:
+        return jsonify([])
+        
+    try:
+        formatted_matches = get_symbol_suggestions(query)
+        return jsonify(formatted_matches)
+    except Exception as e:
+        print(f"Error in symbol search: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # --- Main execution ---
 if __name__ == '__main__':

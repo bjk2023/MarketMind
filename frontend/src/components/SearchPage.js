@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'; // <-- 'useMemo' removed
-import { SearchIcon } from './Icons';
+import React, { useState, useEffect } from 'react';
+import { Search } from 'lucide-react'; 
 import StockDataCard from './ui/StockDataCard';
 import PredictionPreviewCard from './ui/PredictionPreviewCard';
 import StockChart from './charts/StockChart'; 
@@ -12,6 +12,22 @@ const timeFrames = [
     { label: '6M', value: '6mo' },
     { label: '1Y', value: '1y' },
 ];
+
+// --- Custom hook for debouncing ---
+function useDebounce(value, delay) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        
+        // Clean up the timeout on every render if value or delay changes
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
+}
 
 const SearchPage = ({ onNavigateToPredictions }) => {
     const [ticker, setTicker] = useState('');
@@ -28,7 +44,15 @@ const SearchPage = ({ onNavigateToPredictions }) => {
     const [compareTicker, setCompareTicker] = useState('');
     const [comparisonData, setComparisonData] = useState(null);
 
+    // --- Autocomplete state ---
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    
+    // --- Debounce the user's input ---
+    const debouncedQuery = useDebounce(ticker, 300); // 300ms delay
+
     useEffect(() => {
+        // Load recent searches from localStorage
         const saved = localStorage.getItem('recentSearches');
         if (saved) {
             try {
@@ -37,7 +61,43 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                 console.error('Failed to load recent searches:', e);
             }
         }
-    }, []);
+    }, []); 
+
+    // --- This effect runs when the DEBOUNCED query changes ---
+    useEffect(() => {
+        const fetchSuggestions = async () => {
+            // Don't search for 1-letter queries or if it's a known recent search
+            if (debouncedQuery.length < 2 || recentSearches.includes(debouncedQuery)) {
+                setSuggestions([]);
+                setShowSuggestions(false);
+                return;
+            }
+
+            try {
+                // Call our new backend endpoint
+                const response = await fetch(`http://127.0.0.1:5001/search-symbols?q=${debouncedQuery}`);
+                if (!response.ok) throw new Error("Search failed");
+                
+                const data = await response.json();
+                
+                // Don't show suggestions if the only match is what's typed
+                if (data.length === 1 && data[0].symbol === debouncedQuery) {
+                     setSuggestions([]);
+                     setShowSuggestions(false);
+                } else {
+                    setSuggestions(data);
+                    setShowSuggestions(data.length > 0);
+                }
+                
+            } catch (err) {
+                console.error("Suggestion fetch error:", err);
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
+        };
+
+        fetchSuggestions();
+    }, [debouncedQuery, recentSearches]); // <-- Linter warning fixed
 
     const saveRecentSearch = (searchTicker) => {
         const updated = [searchTicker.toUpperCase(), ...recentSearches.filter(t => t !== searchTicker.toUpperCase())].slice(0, 8);
@@ -49,7 +109,6 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         setRecentSearches([]);
         localStorage.removeItem('recentSearches');
     };
-
 
     const fetchChartData = async (symbol, timeFrame) => {
         setChartLoading(true);
@@ -70,7 +129,11 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         }
     };
     
+    // --- This is the REVERTED executeSearch ---
     const executeSearch = async (searchTicker) => {
+        setShowSuggestions(false); 
+        setSuggestions([]);
+
         setLoading(true);
         setStockData(null);
         setChartData(null);
@@ -144,6 +207,17 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         executeSearch(recentTicker);
     };
 
+    const handleSuggestionClick = (suggestion) => {
+        setTicker(suggestion.symbol); 
+        setSuggestions([]); 
+        setShowSuggestions(false); 
+        executeSearch(suggestion.symbol); 
+    };
+
+    const handleTickerChange = (e) => {
+        setTicker(e.target.value.toUpperCase());
+    };
+
     const handleTimeFrameChange = (timeFrame) => {
         setActiveTimeFrame(timeFrame);
         if (searchedTicker) {
@@ -179,24 +253,54 @@ const SearchPage = ({ onNavigateToPredictions }) => {
             <div className="w-full max-w-2xl text-center">
                 <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white">Stock Ticker Search</h1>
                 <p className="text-lg text-gray-500 dark:text-gray-400 mt-3">Enter a stock symbol to get the latest data.</p>
-                <form onSubmit={handleSearch} className="mt-8 flex relative">
+                
+                <form onSubmit={handleSearch} className="mt-8 relative">
                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-                        <SearchIcon />
+                        <Search className="w-6 h-6 text-gray-400" />
                     </div>
                     <input
                         type="text"
                         value={ticker}
-                        onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                        placeholder="e.g., AAPL"
-                        className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                        onChange={handleTickerChange} 
+                        onFocus={() => {
+                            if (ticker.length > 0 && suggestions.length > 0) {
+                                setShowSuggestions(true);
+                            }
+                        }}
+                        onBlur={() => {
+                            setTimeout(() => {
+                                setShowSuggestions(false);
+                            }, 200);
+                        }}
+                        placeholder="e.g., AAPL or Apple"
+                        className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                        autoComplete="off" 
                     />
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-blue-600 text-white font-bold px-8 py-4 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:bg-blue-300"
+                        className="bg-blue-600 text-white font-bold px-8 py-4 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:bg-blue-300 absolute top-0 right-0 h-full"
                     >
                         {loading ? '...' : 'Search'}
                     </button>
+
+                    {/* Autocomplete Dropdown */}
+                    {showSuggestions && suggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-lg overflow-hidden animate-fade-in">
+                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {suggestions.map((stock) => (
+                                    <li
+                                        key={stock.symbol}
+                                        onMouseDown={() => handleSuggestionClick(stock)}
+                                        className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    >
+                                        <span className="font-bold text-gray-900 dark:text-white">{stock.symbol}</span>
+                                        <span className="ml-3 text-gray-600 dark:text-gray-400">{stock.name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </form>
                 
                 {recentSearches.length > 0 && (
@@ -225,7 +329,13 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                 )}
             </div>
             <div className="w-full max-w-4xl mt-4">
-                {error && !chartLoading && <div className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg">{error}</div>}
+                
+                {/* This is the original error message display */}
+                {error && !chartLoading && (
+                    <div className="text-red-500 text-center p-4 bg-red-100 dark:bg-red-900/30 dark:text-red-300 rounded-lg">
+                        {error}
+                    </div>
+                )}
                 
                 {stockData && <StockDataCard data={stockData} onAddToWatchlist={handleAddToWatchlist} />}
                 
@@ -247,7 +357,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                             <input
                                 type="text"
                                 value={compareTicker}
-                                onChange={(e) => setCompareTicker(e.target.value.toUpperCase())}
+                                onChange={(e) => setCompareTicker(e.g.target.value.toUpperCase())}
                                 placeholder="Compare (e.g., MSFT)"
                                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             />
