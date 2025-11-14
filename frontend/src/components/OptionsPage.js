@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, AlertTriangle } from 'lucide-react'; // Use the Lucide icon
+// --- MODIFIED IMPORTS ---
+import { Search, AlertTriangle, Brain, TrendingUp, TrendingDown, Info, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 // Helper to format numbers or return 'N/A'
 const formatNum = (num, digits = 2) => {
@@ -223,6 +224,135 @@ const ChainTable = ({ data, type, stockPrice, onTradeClick, ownedPositions }) =>
     );
 };
 
+// --- NEW COMPONENT: SuggestionCard ---
+const SuggestionCard = ({ suggestion, onTrade }) => {
+    if (!suggestion || suggestion.suggestion === "Hold") {
+        return (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 animate-fade-in">
+                <div className="flex items-center">
+                    <Info className="w-8 h-8 text-blue-500 mr-3" />
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Analysis Complete</h2>
+                        <p className="text-gray-600 dark:text-gray-400">
+                            {suggestion ? suggestion.reason : "No strong signal found. Hold."}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const {
+        suggestion: tradeType, // "Buy Call" or "Buy Put"
+        reason,
+        confidence,
+        contract,
+        targets
+    } = suggestion;
+
+    const isCall = tradeType === "Buy Call";
+    const confidenceColors = {
+        Low: "text-gray-500 dark:text-gray-400",
+        Medium: "text-yellow-600 dark:text-yellow-400",
+        High: "text-green-600 dark:text-green-400",
+    };
+    const bgColors = {
+        Low: "bg-gray-50 dark:bg-gray-700/50",
+        Medium: "bg-yellow-50 dark:bg-yellow-900/20",
+        High: "bg-green-50 dark:bg-green-900/20",
+    };
+    const borderColors = {
+        Low: "border-gray-200 dark:border-gray-700",
+        Medium: "border-yellow-200 dark:border-yellow-800",
+        High: "border-green-200 dark:border-green-800",
+    };
+
+    return (
+        <div className={`rounded-xl shadow-lg p-6 mb-8 animate-fade-in border ${bgColors[confidence]} ${borderColors[confidence]}`}>
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center">
+                    <Brain className="w-8 h-8 text-blue-600 dark:text-blue-400 mr-3" />
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">AI Trade Suggestion</h2>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${bgColors[confidence]} ${confidenceColors[confidence]}`}>
+                    Confidence: {confidence}
+                </span>
+            </div>
+
+            <p className="text-gray-700 dark:text-gray-300 mb-6">{reason}</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* --- Column 1: The Trade --- */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">Suggested Trade</h3>
+                    <div className="flex items-center my-2">
+                        {isCall ? (
+                            <TrendingUp className="w-10 h-10 text-green-500 mr-3" />
+                        ) : (
+                            <TrendingDown className="w-10 h-10 text-red-500 mr-3" />
+                        )}
+                        <span className={`text-3xl font-bold ${isCall ? 'text-green-600' : 'text-red-600'}`}>
+                            {tradeType}
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => onTrade(contract, isCall ? 'Buy' : 'Buy')} // We always 'Buy' the contract (to open)
+                        className={`w-full px-4 py-2 text-white font-semibold rounded-lg transition-all ${isCall ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+                    >
+                        Trade This Contract
+                    </button>
+                </div>
+
+                {/* --- Column 2: The Contract --- */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">Contract Details</h3>
+                    <div className="space-y-2 mt-3">
+                        <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-300">Strike Price:</span>
+                            <span className="font-bold text-gray-900 dark:text-white">${formatNum(contract.strikePrice)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-300">Expiration:</span>
+                            <span className="font-bold text-gray-900 dark:text-white">{contract.expirationDate}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-300">Premium (Ask):</span>
+                            <span className="font-bold text-gray-900 dark:text-white">${formatNum(contract.ask)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-300">Underlying:</span>
+                            <span className="font-bold text-gray-900 dark:text-white">${formatNum(contract.underlyingPrice)}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* --- Column 3: The Targets --- */}
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">Targets</h3>
+                    <div className="space-y-3 mt-3">
+                        <div className="flex items-start">
+                            <XCircle className="w-5 h-5 text-red-500 mr-2 flex-shrink-0" />
+                            <div>
+                                <span className="text-gray-600 dark:text-gray-300">Stop Loss:</span>
+                                <p className="font-medium text-sm text-gray-800 dark:text-gray-100">{targets.stopLoss}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start">
+                            <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" />
+                            <div>
+                                <span className="text-gray-600 dark:text-gray-300">Take Profit:</span>
+                                <p className="font-medium text-sm text-gray-800 dark:text-gray-100">{targets.takeProfit}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- END OF NEW COMPONENT ---
+
+
 const OptionsPage = () => {
     const [ticker, setTicker] = useState('');
     const [expirations, setExpirations] = useState([]);
@@ -239,6 +369,11 @@ const OptionsPage = () => {
 
     const [ownedPositions, setOwnedPositions] = useState({});
     
+    // --- NEW STATE ---
+    const [suggestion, setSuggestion] = useState(null);
+    const [suggestionLoading, setSuggestionLoading] = useState(false);
+    // --- END NEW STATE ---
+
     const fetchOwnedPositions = async () => {
         try {
             const response = await fetch('http://127.0.0.1:5001/paper/portfolio');
@@ -253,6 +388,26 @@ const OptionsPage = () => {
         }
     };
 
+    // --- NEW FUNCTION ---
+    const fetchSuggestion = async (tickerToFetch) => {
+        setSuggestionLoading(true);
+        try {
+            const response = await fetch(`http://127.0.0.1:5001/options/suggest/${tickerToFetch}`);
+            const data = await response.json();
+            if (response.ok) {
+                setSuggestion(data);
+            } else {
+                setSuggestion({ suggestion: "Hold", reason: data.error || "Could not generate suggestion." });
+            }
+        } catch (err) {
+            setSuggestion({ suggestion: "Hold", reason: "Error fetching suggestion." });
+        } finally {
+            setSuggestionLoading(false);
+        }
+    };
+    // --- END NEW FUNCTION ---
+
+    // --- MODIFIED FUNCTION ---
     const handleSearchTicker = async (e) => {
         e.preventDefault();
         if (!ticker) return;
@@ -264,6 +419,12 @@ const OptionsPage = () => {
         setSelectedDate('');
         setStockPrice(null);
         setTradeMessage({ type: '', text: '' });
+        
+        // --- NEW ---
+        setSuggestion(null);
+        fetchSuggestion(ticker); // Start fetching suggestion
+        // --- END NEW ---
+        
         fetchOwnedPositions(); 
 
         try {
@@ -284,8 +445,12 @@ const OptionsPage = () => {
         } catch (err) {
             setError(err.message);
             setLoading(false);
+            // --- NEW ---
+            setSuggestionLoading(false); // Stop loading if chain fails
+            // --- END NEW ---
         }
     };
+    // --- END MODIFIED FUNCTION ---
 
     const fetchChain = async (tickerToFetch, date) => {
         setLoading(true);
@@ -383,10 +548,10 @@ const OptionsPage = () => {
                         </div>
                         <button
                             type="submit"
-                            disabled={loading}
-                            className={`px-8 py-3 rounded-lg font-semibold text-white transition-all ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                            disabled={loading || suggestionLoading}
+                            className={`px-8 py-3 rounded-lg font-semibold text-white transition-all ${loading || suggestionLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
                         >
-                            {loading ? 'Loading...' : 'Search'}
+                            {loading || suggestionLoading ? 'Loading...' : 'Search'}
                         </button>
                     </form>
                 </div>
@@ -400,6 +565,21 @@ const OptionsPage = () => {
                         {tradeMessage.text}
                     </div>
                 )}
+
+                {/* --- NEW: SUGGESTION CARD RENDER --- */}
+                {suggestionLoading && (
+                    <div className="text-center p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg mb-8">
+                        <Loader2 className="w-8 h-8 text-blue-500 animate-spin inline-block" />
+                        <p className="text-gray-600 dark:text-gray-400 mt-2">Analyzing ticker...</p>
+                    </div>
+                )}
+                {suggestion && !suggestionLoading && (
+                    <SuggestionCard 
+                        suggestion={suggestion} 
+                        onTrade={handleTradeClick} // Pass the existing trade handler
+                    />
+                )}
+                {/* --- END OF NEW RENDER --- */}
 
                 {error && <div className="text-center p-4 text-red-500">{error}</div>}
 

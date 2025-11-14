@@ -17,6 +17,7 @@ from forex_fetcher import get_exchange_rate, get_currency_list
 from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
 from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
 from dotenv import load_dotenv
+from options_suggester import generate_suggestion
 
 # --- Alpaca Imports REMOVED ---
 
@@ -539,6 +540,23 @@ def get_paper_portfolio():
         "options_positions": options_positions_list
     })
 
+@app.route('/options/suggest/<string:ticker>', methods=['GET'])
+def get_option_suggestion(ticker):
+    """
+    Generates a Call/Put suggestion based on ML, TA, and Sentiment.
+    """
+    try:
+        sanitized_ticker = ticker.split(':')[0].upper()
+        suggestion = generate_suggestion(sanitized_ticker)
+        
+        if "error" in suggestion:
+            return jsonify(suggestion), 404
+            
+        return jsonify(suggestion)
+        
+    except Exception as e:
+        print(f"Error in suggestion endpoint for {ticker}: {e}")
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 @app.route('/paper/buy', methods=['POST'])
 def buy_stock():
