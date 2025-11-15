@@ -15,12 +15,20 @@ from forex_fetcher import get_exchange_rate, get_currency_list
 from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
 from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
 from dotenv import load_dotenv
+from logger_config import setup_logger, log_api_request, log_api_error, log_data_fetch
 
 load_dotenv()
+
+# Initialize logger
+logger = setup_logger('marketmind_api')
+logger.info("🚀 MarketMind API Starting...")
 
 # Initialize the Flask application
 app = Flask(__name__)
 CORS(app)
+
+# Log Flask initialization
+logger.info("✅ Flask app initialized with CORS enabled")
 
 
 # --- NEW: In-memory storage for the watchlist ---
@@ -97,12 +105,14 @@ def predict_stock(ticker):
     """
     Predicts the next day's closing price for a given stock ticker.
     """
+    log_api_request(logger, f'/predict/{ticker}', 'GET', status='started')
     try:
         # Create dataset for the last 15 days - predicting today's close using past 14
         stock = yf.Ticker(ticker)
         info = stock.info
         df = create_dataset(ticker, period="15d")
         if df.empty:
+            logger.warning(f"No historical data available for {ticker}")
             return jsonify({"error": "No historical data available."}), 404
 
         # Predict today's closing price
@@ -129,10 +139,11 @@ def predict_stock(ticker):
             ]
         }
 
+        logger.info(f"✅ Prediction completed for {ticker} | Recent: ${recent_close:.2f} | Predicted: ${recent_predicted:.2f}")
         return jsonify(response)
 
     except Exception as e:
-        print(f"Error predicting stock {ticker}: {e}")
+        log_api_error(logger, f'/predict/{ticker}', e, ticker)
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
 
