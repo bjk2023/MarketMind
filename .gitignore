@@ -7,3 +7,5 @@ frontend/.cache/
 backend/.coverage
 /backend/__pycache__
 backend/__pycache__/
+backend/marketmind.db
+.idea/
