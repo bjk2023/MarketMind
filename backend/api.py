@@ -4,6 +4,10 @@
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import load_model
+
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -208,6 +212,41 @@ def sell_stock():
     paper_portfolio["cash"] += proceeds
 
     return jsonify({"message": f"Sold {shares} {ticker} at ${price:.2f}"}), 200
+
+# --- LSTM/GRU Prediction Endpoint ---
+
+from train_lstmandgrumodel import predict_next_day_price
+import yfinance as yf
+from flask import jsonify
+
+@app.route('/predict/<string:ticker>', methods=['GET'])
+def predict_stock(ticker):
+    """
+    Predict next-day closing price using pre-trained LSTM/GRU model.
+    If the model for the ticker doesn't exist, it will be trained automatically.
+    """
+    try:
+        ticker = ticker.upper()
+
+        # Get predicted next-day price
+        prediction = predict_next_day_price(ticker)
+
+        # Get last close price for reference
+        data = yf.download(ticker, period="1mo")["Close"].values
+        if len(data) == 0:
+            return jsonify({"error": f"No recent data found for ticker '{ticker}'"}), 404
+
+        last_close = float(data[-1])
+
+        return jsonify({
+            "ticker": ticker,
+            "last_close": last_close,
+            "predicted_next_close": prediction
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
