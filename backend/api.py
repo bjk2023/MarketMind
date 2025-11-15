@@ -16,6 +16,13 @@ from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target
 from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
 from dotenv import load_dotenv
 from logger_config import setup_logger, log_api_request, log_api_error, log_data_fetch
+from security import (
+    setup_rate_limiting, 
+    RateLimits,
+    validate_ticker, 
+    validate_request_json,
+    sanitize_ticker
+)
 
 load_dotenv()
 
@@ -26,6 +33,10 @@ logger.info("🚀 MarketMind API Starting...")
 # Initialize the Flask application
 app = Flask(__name__)
 CORS(app)
+
+# Setup rate limiting
+limiter = setup_rate_limiting(app)
+logger.info("🔒 Rate limiting enabled")
 
 # Log Flask initialization
 logger.info("✅ Flask app initialized with CORS enabled")
@@ -38,32 +49,53 @@ watchlist = set()
 # --- Watchlist Endpoints ---
 
 @app.route('/watchlist', methods=['GET'])
+@limiter.limit(RateLimits.LIGHT)
 def get_watchlist():
     """Returns the list of tickers in the watchlist."""
     return jsonify(list(watchlist))
 
 @app.route('/watchlist/<string:ticker>', methods=['POST'])
+@limiter.limit(RateLimits.WRITE)
 def add_to_watchlist(ticker):
     """Adds a ticker to the watchlist."""
-    ticker = ticker.upper()
+    # Validate and sanitize ticker
+    is_valid, error = validate_ticker(ticker)
+    if not is_valid:
+        logger.warning(f"Invalid ticker in watchlist add: {ticker}")
+        return jsonify({"error": error}), 400
+    
+    ticker = sanitize_ticker(ticker)
     watchlist.add(ticker)
+    logger.info(f"Added {ticker} to watchlist")
     return jsonify({"message": f"{ticker} added to watchlist.", "watchlist": list(watchlist)}), 201
 
 @app.route('/watchlist/<string:ticker>', methods=['DELETE'])
+@limiter.limit(RateLimits.WRITE)
 def remove_from_watchlist(ticker):
     """Removes a ticker from the watchlist."""
-    ticker = ticker.upper()
+    ticker = sanitize_ticker(ticker)
     watchlist.discard(ticker) # Use discard to avoid errors if ticker not found
+    logger.info(f"Removed {ticker} from watchlist")
     return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
 
 # --- Stock Data Endpoints ---
 
 @app.route('/stock/<string:ticker>')
+@limiter.limit(RateLimits.STANDARD)
 def get_stock_data(ticker):
     """
     This function handles requests for a specific stock ticker using yfinance.
     It fetches company info and formats it for the frontend data card.
     """
+    # Validate and sanitize ticker
+    is_valid, error = validate_ticker(ticker)
+    if not is_valid:
+        logger.warning(f"Invalid ticker format: {ticker} | Error: {error}")
+        return jsonify({"error": error}), 400
+    
+    ticker = sanitize_ticker(ticker)
+    log_api_request(logger, f'/stock/{ticker}', 'GET', status='started')
+    
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -101,10 +133,18 @@ def get_stock_data(ticker):
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 @app.route('/predict/<string:ticker>')
+@limiter.limit(RateLimits.STANDARD)
 def predict_stock(ticker):
     """
     Predicts the next day's closing price for a given stock ticker.
     """
+    # Validate and sanitize ticker
+    is_valid, error = validate_ticker(ticker)
+    if not is_valid:
+        logger.warning(f"Invalid ticker format: {ticker} | Error: {error}")
+        return jsonify({"error": error}), 400
+    
+    ticker = sanitize_ticker(ticker)
     log_api_request(logger, f'/predict/{ticker}', 'GET', status='started')
     try:
         # Create dataset for the last 15 days - predicting today's close using past 14
@@ -148,10 +188,20 @@ def predict_stock(ticker):
 
 
 @app.route('/predict/ensemble/<string:ticker>')
+@limiter.limit(RateLimits.STANDARD)
 def predict_ensemble(ticker):
     """
     Enhanced prediction using ensemble of multiple ML models (Linear Regression, Random Forest, XGBoost)
     """
+    # Validate and sanitize ticker
+    is_valid, error = validate_ticker(ticker)
+    if not is_valid:
+        logger.warning(f"Invalid ticker format: {ticker} | Error: {error}")
+        return jsonify({"error": error}), 400
+    
+    ticker = sanitize_ticker(ticker)
+    log_api_request(logger, f'/predict/ensemble/{ticker}', 'GET', status='started')
+    
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
@@ -350,11 +400,20 @@ def get_paper_portfolio():
 
 
 @app.route('/paper/buy', methods=['POST'])
+@limiter.limit(RateLimits.WRITE)
+@validate_request_json(['ticker', 'shares'])
 def buy_stock():
     """Simulate buying shares in the paper trading account."""
     try:
         data = request.get_json()
-        ticker = data.get('ticker', '').upper()
+        ticker = sanitize_ticker(data.get('ticker', ''))
+        
+        # Validate ticker
+        is_valid, error = validate_ticker(ticker)
+        if not is_valid:
+            logger.warning(f"Invalid ticker in buy request: {ticker}")
+            return jsonify({"error": error}), 400
+        
         shares = float(data.get('shares', 0))
         
         if shares <= 0:
@@ -403,11 +462,20 @@ def buy_stock():
 
 
 @app.route('/paper/sell', methods=['POST'])
+@limiter.limit(RateLimits.WRITE)
+@validate_request_json(['ticker', 'shares'])
 def sell_stock():
     """Simulate selling shares."""
     try:
         data = request.get_json()
-        ticker = data.get('ticker', '').upper()
+        ticker = sanitize_ticker(data.get('ticker', ''))
+        
+        # Validate ticker
+        is_valid, error = validate_ticker(ticker)
+        if not is_valid:
+            logger.warning(f"Invalid ticker in sell request: {ticker}")
+            return jsonify({"error": error}), 400
+        
         shares = float(data.get('shares', 0))
         
         if shares <= 0:
@@ -497,6 +565,7 @@ def news_api():
 
 
 @app.route('/evaluate/<string:ticker>')
+@limiter.limit(RateLimits.HEAVY)
 def evaluate_models(ticker):
     """
     Professional-grade evaluation with rolling window backtesting
@@ -504,6 +573,15 @@ def evaluate_models(ticker):
     Uses 42 fixed features, multiple ML models, and comprehensive metrics
     Returns predictions vs actuals, all metrics, and trading performance
     """
+    # Validate and sanitize ticker
+    is_valid, error = validate_ticker(ticker)
+    if not is_valid:
+        logger.warning(f"Invalid ticker format: {ticker} | Error: {error}")
+        return jsonify({"error": error}), 400
+    
+    ticker = sanitize_ticker(ticker)
+    log_api_request(logger, f'/evaluate/{ticker}', 'GET', status='started')
+    
     try:
         test_days = int(request.args.get('test_days', 60))
         retrain_frequency = int(request.args.get('retrain_frequency', 5))
