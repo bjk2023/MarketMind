@@ -4,7 +4,7 @@ import os
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from model import create_dataset, estimate_this_week, try_today, estimate_new, good_model
+from model import create_dataset, estimate_this_week, try_today, estimate_new, good_model, estimate_model_new
 
 # Initialize the Flask application
 app = Flask(__name__)

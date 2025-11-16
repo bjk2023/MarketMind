@@ -2,6 +2,9 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.ar_model import AutoReg
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
 
 
 #Creating a dataset based on ticker and period
@@ -18,19 +21,19 @@ def create_dataset(ticker, period):
 #Testing model on todays value - removing last row and predicting it to compare
 def try_today(df):
     today = pd.Timestamp.today().normalize()
-    new_df = estimate_new(df, today - pd.Timedelta(days=1))
+    new_df = estimate_rf_new(df, today - pd.Timedelta(days=1))
     
     return new_df.tail(1)
 
 def estimate_this_week(df):
     last_valid_index = df['Close'].last_valid_index()
-    new_df = estimate_new(df, last_valid_index - pd.Timedelta(days=1), numdays=7)
+    new_df = estimate_rf_new(df, last_valid_index - pd.Timedelta(days=1), numdays=7)
     last_valid_index = new_df['Close'].last_valid_index()
 
     return new_df.loc[last_valid_index:]
 
 #Estimating next day(s) value based on previous values
-def estimate_new(df, startdays, numdays=1):
+def estimate_ar_new(df, startdays, numdays=1):
     df = df.copy()
     df.index = pd.to_datetime(df.index)
     df["Predicted"] = np.nan
@@ -45,6 +48,39 @@ def estimate_new(df, startdays, numdays=1):
 
         next_day_pred = model_fit.predict(start=len(values), end=len(values))[0]
         next_date = startdays + pd.Timedelta(days=1)
+
+        if next_date in df.index:
+            df.loc[next_date, "Predicted"] = next_day_pred
+        else:
+            df.loc[next_date] = [np.nan, next_day_pred]
+
+        df_subset = df.loc[df.index <= next_date]
+        startdays = startdays + pd.Timedelta(days=1)
+    return df
+
+def estimate_rf_new(df, startdays, numdays=1): 
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
+    df["Predicted"] = np.nan
+    df_subset = df.loc[:startdays]
+
+    for _ in range(numdays):
+        values = df_subset["Predicted"].fillna(df_subset["Close"].squeeze()).dropna().values
+
+        lags = 1
+
+        X_train, y_train = [], []
+        for i in range(lags, len(values)):
+            X_train.append(values[i-lags:i])
+            y_train.append(values[i])
+        X_train, y_train = np.array(X_train), np.array(y_train)
+
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train) 
+
+        last_values = values[-lags:].reshape(1, -1)
+        next_day_pred = model.predict(last_values)[0]
+        next_date = df_subset.index[-1] + pd.Timedelta(days=1)
 
         if next_date in df.index:
             df.loc[next_date, "Predicted"] = next_day_pred
