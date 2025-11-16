@@ -4,7 +4,7 @@ import os
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from model import create_dataset, estimate_week, try_today, estimate_new, good_model
+from model import create_dataset, estimate_this_week, try_today, estimate_new, good_model
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -94,15 +94,16 @@ def predict_stock(ticker):
             return jsonify({"error": "No historical data available."}), 404
 
         # Predict today's closing price
-        current_df = estimate_week(df)
+        current_df = estimate_this_week(df)
         prediction_df = current_df.tail(6)
+        last_valid_index = current_df['Close'].last_valid_index()
 
         response = {
             "symbol": info.get('symbol', ticker.upper()),
             "companyName": info.get('longName', 'N/A'),
             "symbol": ticker.upper(),
-            "recentDate": current_df.index[0].strftime('%Y-%m-%d'),
-            "recentClose": round(current_df["Close"].iloc[0], 2),
+            "recentDate": last_valid_index.strftime('%Y-%m-%d'),
+            "recentClose": round(current_df.loc[last_valid_index]["Close"].item(), 2),
             "recentPredicted": round(current_df["Predicted"].iloc[0], 2),
             "predictions": [
                 {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(pred, 2)}

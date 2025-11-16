@@ -23,10 +23,11 @@ def try_today(df):
     return new_df.tail(1)
 
 def estimate_this_week(df):
-    today = pd.Timestamp.today().normalize()
-    new_df = estimate_new(df, today - pd.Timedelta(days=1), numdays=7)
+    last_valid_index = df['Close'].last_valid_index()
+    new_df = estimate_new(df, last_valid_index - pd.Timedelta(days=1), numdays=7)
+    last_valid_index = new_df['Close'].last_valid_index()
 
-    return new_df.tail(7)
+    return new_df.loc[last_valid_index:]
 
 #Estimating next day(s) value based on previous values
 def estimate_new(df, startdays, numdays=1):
@@ -36,7 +37,7 @@ def estimate_new(df, startdays, numdays=1):
     df_subset = df.loc[:startdays + pd.Timedelta(days=1)]
 
     for _ in range(numdays):
-        values = df_subset["Predicted"].fillna(df_subset["Close"]).dropna().values
+        values = df_subset["Predicted"].fillna(df_subset["Close"].squeeze()).dropna().values
 
         lags = 1
         model = AutoReg(values, lags=lags)
@@ -63,3 +64,15 @@ def good_model(df_predicted):
     if mae < avg_daily_change:
         return True
     return False
+
+if __name__ == "__main__":
+    # Example usage
+    ticker = "AAPL"
+    period = "1mo"
+    df = create_dataset(ticker, period)
+    df1 = estimate_this_week(df)
+    print(df1)
+    print(df1.tail(7))
+    last_valid_index = df['Close'].last_valid_index()
+    print(df1.loc[last_valid_index]['Close'].item())
+    print(df1["Predicted"].iloc[0])

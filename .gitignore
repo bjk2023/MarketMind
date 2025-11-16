@@ -9,3 +9,4 @@ backend/.coverage
 backend/__pycache__/
 backend/marketmind.db
 .idea/
+/backend/__pycache__
