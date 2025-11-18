@@ -47,6 +47,9 @@ const SearchPage = ({ onNavigateToPredictions }) => {
     const [suggestions, setSuggestions] = useState(null);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [expandedSectors, setExpandedSectors] = useState({});
+    // --- NEW: Autocomplete states ---
+    const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
+    const [showAutocomplete, setShowAutocomplete] = useState(false);
 
     // Fetch suggestions from API
     const fetchSuggestions = async () => {
@@ -63,6 +66,32 @@ const SearchPage = ({ onNavigateToPredictions }) => {
             setLoadingSuggestions(false);
         }
     };
+
+    // --- NEW: Autocomplete fetch function ---
+    const fetchAutocompleteSuggestions = async (query) => {
+        if (!query || query.length < 2) {
+            setAutocompleteSuggestions([]);
+            setShowAutocomplete(false);
+            return;
+        }
+        
+        try {
+            const response = await fetch(`http://127.0.0.1:5001/search-symbols?q=${encodeURIComponent(query)}`);
+            if (response.ok) {
+                const data = await response.json();
+                setAutocompleteSuggestions(data.slice(0, 8)); // Limit to 8 results
+                setShowAutocomplete(true);
+            } else {
+                setAutocompleteSuggestions([]);
+                setShowAutocomplete(false);
+            }
+        } catch (error) {
+            console.error('Error fetching autocomplete suggestions:', error);
+            setAutocompleteSuggestions([]);
+            setShowAutocomplete(false);
+        }
+    };
+    // --- END AUTOCOMPLETE ---
 
     // Handle suggestion click
     const handleSuggestionClick = async (ticker) => {
@@ -173,6 +202,33 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         }
     };
 
+    // --- NEW: Autocomplete handlers ---
+    const handleAutocompleteClick = (suggestion) => {
+        setTicker(suggestion.symbol);
+        setShowAutocomplete(false);
+        setAutocompleteSuggestions([]);
+        handleSearch({ preventDefault: () => {} });
+    };
+
+    const handleTickerChange = (e) => {
+        const value = e.target.value.toUpperCase();
+        setTicker(value);
+        fetchAutocompleteSuggestions(value);
+    };
+
+    const handleTickerFocus = () => {
+        if (ticker.length > 1 && autocompleteSuggestions.length > 0) {
+            setShowAutocomplete(true);
+        }
+    };
+
+    const handleTickerBlur = () => {
+        setTimeout(() => {
+            setShowAutocomplete(false);
+        }, 200);
+    };
+    // --- END AUTOCOMPLETE HANDLERS ---
+
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!ticker) return;
@@ -246,24 +302,45 @@ const SearchPage = ({ onNavigateToPredictions }) => {
             <div className="w-full max-w-2xl text-center">
                 <h1 className="text-5xl font-extrabold text-gray-800 dark:text-white">Stock Ticker Search</h1>
                 <p className="text-lg text-gray-500 dark:text-gray-400 mt-3">Enter a stock symbol to get the latest data.</p>
-                <form onSubmit={handleSearch} className="mt-8 flex relative">
+                <form onSubmit={handleSearch} className="mt-8 relative">
                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
                         <SearchIcon />
                     </div>
                     <input
                         type="text"
                         value={ticker}
-                        onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                        placeholder="e.g., AAPL"
-                        className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                        onChange={handleTickerChange}
+                        onFocus={handleTickerFocus}
+                        onBlur={handleTickerBlur}
+                        placeholder="e.g., AAPL or Apple"
+                        className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                        autoComplete="off"
                     />
                     <button
                         type="submit"
                         disabled={loading}
-                        className="bg-blue-600 text-white font-bold px-8 py-4 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:bg-blue-300"
+                        className="bg-blue-600 text-white font-bold px-8 py-4 rounded-r-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:bg-blue-300 absolute top-0 right-0 h-full"
                     >
                         {loading ? '...' : 'Search'}
                     </button>
+
+                    {/* Autocomplete Dropdown */}
+                    {showAutocomplete && autocompleteSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-lg shadow-lg overflow-hidden animate-fade-in">
+                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {autocompleteSuggestions.map((stock) => (
+                                    <li
+                                        key={stock.symbol}
+                                        onMouseDown={() => handleAutocompleteClick(stock)}
+                                        className="px-4 py-3 text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    >
+                                        <span className="font-bold text-gray-900 dark:text-white">{stock.symbol}</span>
+                                        <span className="ml-3 text-gray-600 dark:text-gray-400">{stock.name}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                 </form>
                 
                 {/* Recent Searches */}
