@@ -59,6 +59,215 @@ with app.app_context():
     default_user = create_default_user()
     logger.info(f"✅ Default user ready: {default_user.username if default_user else 'None'}")
 
+# --- Search Suggestions Endpoints ---
+
+# Cache for suggestions (refresh every 5 minutes)
+suggestions_cache = {
+    "data": None,
+    "timestamp": 0,
+    "cache_duration": 300  # 5 minutes
+}
+
+@app.route('/search/suggestions', methods=['GET'])
+@limiter.limit(RateLimits.LIGHT)
+def get_search_suggestions():
+    """Get trending stocks and sector-based suggestions"""
+    import time
+    
+    # Check cache
+    current_time = time.time()
+    if (suggestions_cache["data"] and 
+        current_time - suggestions_cache["timestamp"] < suggestions_cache["cache_duration"]):
+        log_api_request(logger, '/search/suggestions', 'GET', status='cache_hit')
+        return jsonify(suggestions_cache["data"])
+    
+    try:
+        import yfinance as yf
+        
+        # Define sectors with sample stocks (organized by market cap and importance)
+        sectors = {
+            "Technology": {
+                "description": "Software, Hardware & AI",
+                "stocks": [
+                    {"ticker": "AAPL", "name": "Apple Inc.", "market_cap": "Mega"},
+                    {"ticker": "MSFT", "name": "Microsoft Corporation", "market_cap": "Mega"},
+                    {"ticker": "GOOGL", "name": "Alphabet Inc.", "market_cap": "Mega"},
+                    {"ticker": "NVDA", "name": "NVIDIA Corporation", "market_cap": "Mega"},
+                    {"ticker": "META", "name": "Meta Platforms Inc.", "market_cap": "Mega"},
+                    {"ticker": "AMD", "name": "Advanced Micro Devices", "market_cap": "Large"},
+                    {"ticker": "CRM", "name": "Salesforce Inc.", "market_cap": "Large"},
+                    {"ticker": "ORCL", "name": "Oracle Corporation", "market_cap": "Large"}
+                ]
+            },
+            "Finance": {
+                "description": "Banking & Financial Services",
+                "stocks": [
+                    {"ticker": "JPM", "name": "JPMorgan Chase & Co.", "market_cap": "Mega"},
+                    {"ticker": "BAC", "name": "Bank of America Corp", "market_cap": "Mega"},
+                    {"ticker": "GS", "name": "Goldman Sachs Group", "market_cap": "Large"},
+                    {"ticker": "MS", "name": "Morgan Stanley", "market_cap": "Large"},
+                    {"ticker": "WFC", "name": "Wells Fargo & Co.", "market_cap": "Large"},
+                    {"ticker": "C", "name": "Citigroup Inc.", "market_cap": "Large"},
+                    {"ticker": "AXP", "name": "American Express", "market_cap": "Large"},
+                    {"ticker": "BLK", "name": "BlackRock Inc.", "market_cap": "Large"}
+                ]
+            },
+            "Healthcare": {
+                "description": "Pharmaceuticals & Healthcare Services",
+                "stocks": [
+                    {"ticker": "JNJ", "name": "Johnson & Johnson", "market_cap": "Mega"},
+                    {"ticker": "UNH", "name": "UnitedHealth Group", "market_cap": "Mega"},
+                    {"ticker": "PFE", "name": "Pfizer Inc.", "market_cap": "Large"},
+                    {"ticker": "ABBV", "name": "AbbVie Inc.", "market_cap": "Large"},
+                    {"ticker": "TSLA", "name": "Tesla Inc.", "market_cap": "Mega"},
+                    {"ticker": "MRK", "name": "Merck & Co.", "market_cap": "Large"},
+                    {"ticker": "ABT", "name": "Abbott Laboratories", "market_cap": "Large"},
+                    {"ticker": "CVS", "name": "CVS Health Corp", "market_cap": "Large"}
+                ]
+            },
+            "Consumer": {
+                "description": "Retail & Consumer Products",
+                "stocks": [
+                    {"ticker": "AMZN", "name": "Amazon.com Inc.", "market_cap": "Mega"},
+                    {"ticker": "TSLA", "name": "Tesla Inc.", "market_cap": "Mega"},
+                    {"ticker": "HD", "name": "Home Depot Inc.", "market_cap": "Large"},
+                    {"ticker": "WMT", "name": "Walmart Inc.", "market_cap": "Mega"},
+                    {"ticker": "MCD", "name": "McDonald's Corp", "market_cap": "Large"},
+                    {"ticker": "NKE", "name": "Nike Inc.", "market_cap": "Large"},
+                    {"ticker": "SBUX", "name": "Starbucks Corp", "market_cap": "Large"},
+                    {"ticker": "COST", "name": "Costco Wholesale", "market_cap": "Large"}
+                ]
+            },
+            "Energy": {
+                "description": "Oil & Gas Companies",
+                "stocks": [
+                    {"ticker": "XOM", "name": "Exxon Mobil Corp", "market_cap": "Mega"},
+                    {"ticker": "CVX", "name": "Chevron Corp", "market_cap": "Mega"},
+                    {"ticker": "COP", "name": "ConocoPhillips", "market_cap": "Large"},
+                    {"ticker": "SHEL", "name": "Shell plc", "market_cap": "Large"},
+                    {"ticker": "BP", "name": "BP plc", "market_cap": "Large"},
+                    {"ticker": "TTE", "name": "TotalEnergies SE", "market_cap": "Large"},
+                    {"ticker": "EOG", "name": "EOG Resources", "market_cap": "Large"},
+                    {"ticker": "SLB", "name": "Schlumberger NV", "market_cap": "Large"}
+                ]
+            },
+            "Industrial": {
+                "description": "Manufacturing & Infrastructure",
+                "stocks": [
+                    {"ticker": "CAT", "name": "Caterpillar Inc.", "market_cap": "Large"},
+                    {"ticker": "GE", "name": "General Electric Co.", "market_cap": "Large"},
+                    {"ticker": "BA", "name": "Boeing Co.", "market_cap": "Large"},
+                    {"ticker": "MMM", "name": "3M Company", "market_cap": "Large"},
+                    {"ticker": "HON", "name": "Honeywell International", "market_cap": "Large"},
+                    {"ticker": "UPS", "name": "United Parcel Service", "market_cap": "Large"},
+                    {"ticker": "RTX", "name": "Raytheon Technologies", "market_cap": "Large"},
+                    {"ticker": "LMT", "name": "Lockheed Martin Corp.", "market_cap": "Large"}
+                ]
+            }
+        }
+        
+        # Get trending data
+        trending = {
+            "gainers": [],
+            "losers": [],
+            "most_active": []
+        }
+        
+        try:
+            # Fetch trending data more efficiently - batch request
+            trending_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "JPM", "JNJ", "V"]
+            
+            # Use yfinance's multi-ticker download for better performance
+            tickers_str = " ".join(trending_tickers)
+            data = yf.download(tickers_str, period="1d", group_by="ticker", progress=False)
+            
+            trending_data = []
+            for ticker in trending_tickers:
+                try:
+                    # Get the data for this ticker
+                    ticker_data = data[ticker] if ticker in data else None
+                    if ticker_data is None or ticker_data.empty:
+                        continue
+                    
+                    # Get current price and change
+                    current_price = ticker_data['Close'].iloc[-1] if not ticker_data['Close'].empty else 0
+                    prev_close = ticker_data['Open'].iloc[0] if not ticker_data['Open'].empty else current_price
+                    
+                    # Get additional info
+                    stock = yf.Ticker(ticker)
+                    info = stock.info
+                    
+                    change = current_price - prev_close
+                    change_percent = ((change / prev_close) * 100) if prev_close > 0 else 0
+                    volume = info.get('volume', ticker_data['Volume'].iloc[-1] if not ticker_data['Volume'].empty else 0)
+                    
+                    trending_data.append({
+                        "ticker": ticker,
+                        "name": info.get('longName', ticker),
+                        "price": current_price,
+                        "change": change,
+                        "change_percent": change_percent,
+                        "volume": volume
+                    })
+                except Exception as e:
+                    logger.debug(f"Failed to fetch data for {ticker}: {e}")
+                    continue
+            
+            # Sort by different metrics
+            if trending_data:
+                trending_data.sort(key=lambda x: x.get('change_percent', 0), reverse=True)
+                trending["gainers"] = trending_data[:5]
+                
+                trending_data.sort(key=lambda x: x.get('change_percent', 0))
+                trending["losers"] = trending_data[:5]
+                
+                trending_data.sort(key=lambda x: x.get('volume', 0), reverse=True)
+                trending["most_active"] = trending_data[:5]
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch trending data: {e}")
+            # Fallback to empty trending lists
+        
+        # Add price data to sector stocks (limited to improve performance)
+        for sector_name, sector_data in sectors.items():
+            for stock in sector_data["stocks"][:4]:  # Only fetch first 4 stocks per sector
+                try:
+                    ticker_info = yf.Ticker(stock["ticker"])
+                    info = ticker_info.info
+                    
+                    price = info.get('regularMarketPrice', 0)
+                    if price == 0:
+                        price = info.get('previousClose', 0)
+                    
+                    prev_close = info.get('previousClose', price)
+                    change = price - prev_close
+                    change_percent = ((change / prev_close) * 100) if prev_close > 0 else 0
+                    
+                    stock["price"] = price
+                    stock["change"] = change
+                    stock["change_percent"] = change_percent
+                except:
+                    stock["price"] = 0
+                    stock["change"] = 0
+                    stock["change_percent"] = 0
+        
+        response_data = {
+            "trending": trending,
+            "sectors": sectors
+        }
+        
+        # Update cache
+        suggestions_cache["data"] = response_data
+        suggestions_cache["timestamp"] = current_time
+        
+        log_api_request(logger, '/search/suggestions', 'GET', status='completed')
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        log_api_error(logger, '/search/suggestions', e)
+        return jsonify({"error": "Failed to fetch suggestions"}), 500
+
 # --- Watchlist Endpoints ---
 
 @app.route('/watchlist', methods=['GET'])
