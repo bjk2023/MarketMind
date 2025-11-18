@@ -64,7 +64,7 @@ with app.app_context():
 @app.route('/watchlist', methods=['GET'])
 @limiter.limit(RateLimits.LIGHT)
 def get_watchlist():
-    """Returns the list of tickers in the default user's watchlist."""
+    """Returns the list of tickers in the default user's watchlist with stock data."""
     try:
         # Get default user (demo user)
         from database import User, Watchlist
@@ -82,17 +82,55 @@ def get_watchlist():
                 name='Default Watchlist',
                 description='Default watchlist for demo user'
             )
-            watchlist.set_tickers([])
-            db.session.add(watchlist)
             default_user.watchlists.append(watchlist)
             db.session.commit()
         
+        # Get detailed stock data for each ticker
+        import yfinance as yf
+        import json
+        stocks_data = []
+        
+        # Parse tickers if it's a string
+        tickers_list = watchlist.tickers
+        if isinstance(tickers_list, str):
+            try:
+                tickers_list = json.loads(tickers_list)
+            except:
+                # If parsing fails, try to extract from the string
+                tickers_list = [ticker.strip('"[]') for ticker in tickers_list.split(',')]
+        
+        for ticker in tickers_list:
+            ticker = ticker.strip('"[]')
+            if not ticker:
+                continue
+            try:
+                stock = yf.Ticker(ticker)
+                info = stock.info
+                
+                # Get current price
+                price = info.get('regularMarketPrice', 0)
+                if price == 0:
+                    price = info.get('previousClose', 0)
+                
+                # Get previous close for change calculation
+                prev_close = info.get('previousClose', price)
+                change = price - prev_close
+                change_percent = ((change / prev_close) * 100) if prev_close > 0 else 0
+                
+                stocks_data.append({
+                    "symbol": ticker,
+                    "name": info.get('longName', ticker),
+                    "price": price,
+                    "change": change,
+                    "changePercent": change_percent,
+                    "volume": info.get('volume', 0)
+                })
+            except Exception as e:
+                logger.warning(f"Failed to fetch data for {ticker}: {e}")
+                continue
+        
         log_api_request(logger, '/watchlist', 'GET', status='completed')
-        return jsonify({
-            'id': watchlist.id,
-            'name': watchlist.name,
-            'tickers': watchlist.get_tickers()
-        })
+        return jsonify(stocks_data)
         
     except Exception as e:
         log_api_error(logger, '/watchlist', e)
@@ -730,7 +768,8 @@ def get_trade_history():
                 "ticker": trade.ticker,
                 "shares": trade.shares,
                 "price": trade.price,
-                "trade_type": trade.trade_type,
+                "type": trade.trade_type,  # Changed from trade_type to type
+                "total": trade.total,      # Added total field
                 "timestamp": trade.created_at.isoformat()
             })
 
