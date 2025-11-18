@@ -23,6 +23,7 @@ from security import (
     validate_request_json,
     sanitize_ticker
 )
+from database import db, init_database, create_default_user, update_portfolio_history
 
 load_dotenv()
 
@@ -34,6 +35,13 @@ logger.info("🚀 MarketMind API Starting...")
 app = Flask(__name__)
 CORS(app)
 
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///marketmind.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize database
+db.init_app(app)
+
 # Setup rate limiting
 limiter = setup_rate_limiting(app)
 logger.info("🔒 Rate limiting enabled")
@@ -41,42 +49,147 @@ logger.info("🔒 Rate limiting enabled")
 # Log Flask initialization
 logger.info("✅ Flask app initialized with CORS enabled")
 
+# Initialize database tables
+with app.app_context():
+    init_database(app)
+    logger.info("✅ Database initialized")
 
-# --- NEW: In-memory storage for the watchlist ---
-# Using a set to automatically prevent duplicate tickers
-watchlist = set()
+# Create default user and data
+with app.app_context():
+    default_user = create_default_user()
+    logger.info(f"✅ Default user ready: {default_user.username if default_user else 'None'}")
 
 # --- Watchlist Endpoints ---
 
 @app.route('/watchlist', methods=['GET'])
 @limiter.limit(RateLimits.LIGHT)
 def get_watchlist():
-    """Returns the list of tickers in the watchlist."""
-    return jsonify(list(watchlist))
+    """Returns the list of tickers in the default user's watchlist."""
+    try:
+        # Get default user (demo user)
+        from database import User, Watchlist
+        default_user = User.query.filter_by(username='demo').first()
+        
+        if not default_user:
+            return jsonify({"error": "Default user not found"}), 404
+        
+        # Get first watchlist or create default
+        watchlist = default_user.watchlists[0] if default_user.watchlists else None
+        
+        if not watchlist:
+            # Create default watchlist
+            watchlist = Watchlist(
+                name='Default Watchlist',
+                description='Default watchlist for demo user'
+            )
+            watchlist.set_tickers([])
+            db.session.add(watchlist)
+            default_user.watchlists.append(watchlist)
+            db.session.commit()
+        
+        log_api_request(logger, '/watchlist', 'GET', status='completed')
+        return jsonify({
+            'id': watchlist.id,
+            'name': watchlist.name,
+            'tickers': watchlist.get_tickers()
+        })
+        
+    except Exception as e:
+        log_api_error(logger, '/watchlist', e)
+        return jsonify({"error": "Failed to fetch watchlist"}), 500
 
 @app.route('/watchlist/<string:ticker>', methods=['POST'])
 @limiter.limit(RateLimits.WRITE)
 def add_to_watchlist(ticker):
-    """Adds a ticker to the watchlist."""
-    # Validate and sanitize ticker
-    is_valid, error = validate_ticker(ticker)
-    if not is_valid:
-        logger.warning(f"Invalid ticker in watchlist add: {ticker}")
-        return jsonify({"error": error}), 400
-    
-    ticker = sanitize_ticker(ticker)
-    watchlist.add(ticker)
-    logger.info(f"Added {ticker} to watchlist")
-    return jsonify({"message": f"{ticker} added to watchlist.", "watchlist": list(watchlist)}), 201
+    """Adds a ticker to the default user's watchlist."""
+    try:
+        # Validate and sanitize ticker
+        is_valid, error = validate_ticker(ticker)
+        if not is_valid:
+            logger.warning(f"Invalid ticker in watchlist add: {ticker}")
+            return jsonify({"error": error}), 400
+        
+        ticker = sanitize_ticker(ticker)
+        
+        # Get default user
+        from database import User, Watchlist
+        default_user = User.query.filter_by(username='demo').first()
+        
+        if not default_user:
+            return jsonify({"error": "Default user not found"}), 404
+        
+        # Get or create watchlist
+        watchlist = default_user.watchlists[0] if default_user.watchlists else None
+        
+        if not watchlist:
+            watchlist = Watchlist(
+                name='Default Watchlist',
+                description='Default watchlist for demo user'
+            )
+            watchlist.set_tickers([])
+            db.session.add(watchlist)
+            default_user.watchlists.append(watchlist)
+            db.session.commit()
+        
+        # Add ticker
+        watchlist.add_ticker(ticker)
+        db.session.commit()
+        
+        logger.info(f"Added {ticker} to watchlist")
+        log_api_request(logger, f'/watchlist/{ticker}', 'POST', status='completed')
+        
+        return jsonify({
+            "message": f"{ticker} added to watchlist.",
+            "watchlist": {
+                'id': watchlist.id,
+                'name': watchlist.name,
+                'tickers': watchlist.get_tickers()
+            }
+        }), 201
+        
+    except Exception as e:
+        log_api_error(logger, f'/watchlist/{ticker}', e)
+        return jsonify({"error": "Failed to add ticker to watchlist"}), 500
 
 @app.route('/watchlist/<string:ticker>', methods=['DELETE'])
 @limiter.limit(RateLimits.WRITE)
 def remove_from_watchlist(ticker):
-    """Removes a ticker from the watchlist."""
-    ticker = sanitize_ticker(ticker)
-    watchlist.discard(ticker) # Use discard to avoid errors if ticker not found
-    logger.info(f"Removed {ticker} from watchlist")
-    return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
+    """Removes a ticker from the default user's watchlist."""
+    try:
+        ticker = sanitize_ticker(ticker)
+        
+        # Get default user
+        from database import User
+        default_user = User.query.filter_by(username='demo').first()
+        
+        if not default_user:
+            return jsonify({"error": "Default user not found"}), 404
+        
+        # Get watchlist
+        watchlist = default_user.watchlists[0] if default_user.watchlists else None
+        
+        if not watchlist:
+            return jsonify({"error": "No watchlist found"}), 404
+        
+        # Remove ticker
+        watchlist.remove_ticker(ticker)
+        db.session.commit()
+        
+        logger.info(f"Removed {ticker} from watchlist")
+        log_api_request(logger, f'/watchlist/{ticker}', 'DELETE', status='completed')
+        
+        return jsonify({
+            "message": f"{ticker} removed from watchlist.",
+            "watchlist": {
+                'id': watchlist.id,
+                'name': watchlist.name,
+                'tickers': watchlist.get_tickers()
+            }
+        })
+        
+    except Exception as e:
+        log_api_error(logger, f'/watchlist/{ticker}', e)
+        return jsonify({"error": "Failed to remove ticker from watchlist"}), 500
 
 # --- Stock Data Endpoints ---
 
@@ -314,89 +427,114 @@ def get_chart_data(ticker):
 # --- Paper Trading Endpoints ---
 from datetime import datetime
 
-# Enhanced paper trading data structure
-paper_trading_data = {
-    "cash": 100000.0,
-    "starting_cash": 100000.0,
-    "positions": {},  # {ticker: {"shares": 0, "avg_cost": 0}}
-    "trade_history": [],  # List of all trades
-    "portfolio_history": []  # Daily snapshots
-}
 
-
-def get_current_portfolio_value():
-    """Calculate total portfolio value"""
-    total = paper_trading_data["cash"]
-    for ticker, pos in paper_trading_data["positions"].items():
-        try:
-            stock = yf.Ticker(ticker)
-            price = stock.info.get('regularMarketPrice', 0)
-            if price == 0:
-                price = stock.info.get('previousClose', 0)
-            total += pos["shares"] * price
-        except:
-            pass
-    return total
+def get_default_portfolio():
+    """Get default user's portfolio"""
+    from database import User, Portfolio
+    default_user = User.query.filter_by(username='demo').first()
+    if not default_user:
+        return None
+    
+    portfolio = default_user.portfolios[0] if default_user.portfolios else None
+    if not portfolio:
+        # Create default portfolio
+        portfolio = Portfolio(
+            name='Default Portfolio',
+            description='Default portfolio for demo user',
+            starting_cash=100000.0,
+            current_cash=100000.0,
+            user_id=default_user.id
+        )
+        db.session.add(portfolio)
+        db.session.commit()
+    
+    return portfolio
 
 
 @app.route('/paper/portfolio', methods=['GET'])
 def get_paper_portfolio():
     """Return the current state of the paper trading portfolio with full metrics."""
-    positions_list = []
-    total_positions_value = 0
-    total_cost_basis = 0
+    try:
+        portfolio = get_default_portfolio()
+        if not portfolio:
+            return jsonify({"error": "No default portfolio found"}), 404
 
-    for ticker, pos in paper_trading_data["positions"].items():
-        try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
-            price = info.get('regularMarketPrice', 0)
-            if price == 0:
-                price = info.get('previousClose', 0)
-            
-            prev_close = info.get('previousClose', price)
-            company_name = info.get('longName', ticker)
+        positions_list = []
+        
+        # Get positions from database
+        for position in portfolio.positions:
+            try:
+                stock = yf.Ticker(position.ticker)
+                info = stock.info
+                price = info.get('regularMarketPrice', 0)
+                if price == 0:
+                    price = info.get('previousClose', 0)
+                
+                prev_close = info.get('previousClose', price)
+                company_name = info.get('longName', position.ticker)
 
-            current_value = pos["shares"] * price
-            cost_basis = pos["shares"] * pos["avg_cost"]
-            total_pl = current_value - cost_basis
-            total_pl_percent = (total_pl / cost_basis * 100) if cost_basis > 0 else 0
-            daily_pl = pos["shares"] * (price - prev_close)
-            daily_pl_percent = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
+                current_value = position.shares * price
+                cost_basis = position.get_cost_basis()
+                total_pl = current_value - cost_basis
+                total_pl_percent = (total_pl / cost_basis * 100) if cost_basis > 0 else 0
+                daily_pl = position.shares * (price - prev_close)
+                daily_pl_percent = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
 
-            total_positions_value += current_value
-            total_cost_basis += cost_basis
+                positions_list.append({
+                    "ticker": position.ticker,
+                    "company_name": company_name,
+                    "shares": position.shares,
+                    "avg_cost": position.avg_cost,
+                    "current_price": price,
+                    "prev_close": prev_close,
+                    "current_value": current_value,
+                    "cost_basis": cost_basis,
+                    "total_pl": total_pl,
+                    "total_pl_percent": round(total_pl_percent, 2),
+                    "daily_pl": round(daily_pl, 2),
+                    "daily_pl_percent": round(daily_pl_percent, 2)
+                })
+            except Exception as e:
+                logger.warning(f"Error fetching data for {position.ticker}: {e}")
+                # Add position with basic data
+                positions_list.append({
+                    "ticker": position.ticker,
+                    "company_name": position.ticker,
+                    "shares": position.shares,
+                    "avg_cost": position.avg_cost,
+                    "current_price": position.avg_cost,
+                    "prev_close": position.avg_cost,
+                    "current_value": position.get_cost_basis(),
+                    "cost_basis": position.get_cost_basis(),
+                    "total_pl": 0,
+                    "total_pl_percent": 0,
+                    "daily_pl": 0,
+                    "daily_pl_percent": 0
+                })
 
-            positions_list.append({
-                "ticker": ticker,
-                "company_name": company_name,
-                "shares": pos["shares"],
-                "avg_cost": round(pos["avg_cost"], 2),
-                "current_price": round(price, 2),
-                "current_value": round(current_value, 2),
-                "cost_basis": round(cost_basis, 2),
-                "total_pl": round(total_pl, 2),
-                "total_pl_percent": round(total_pl_percent, 2),
-                "daily_pl": round(daily_pl, 2),
-                "daily_pl_percent": round(daily_pl_percent, 2)
-            })
-        except Exception as e:
-            print(f"Error getting data for {ticker}: {e}")
-            continue
+        # Calculate portfolio totals
+        total_positions_value = sum(pos["current_value"] for pos in positions_list)
+        total_cost_basis = sum(pos["cost_basis"] for pos in positions_list)
+        total_portfolio_value = portfolio.get_total_value()
+        total_cash = portfolio.current_cash
+        total_pl = total_portfolio_value - portfolio.starting_cash
+        total_pl_percent = (total_pl / portfolio.starting_cash * 100) if portfolio.starting_cash > 0 else 0
 
-    total_value = paper_trading_data["cash"] + total_positions_value
-    total_pl = total_value - paper_trading_data["starting_cash"]
-    total_return = (total_pl / paper_trading_data["starting_cash"] * 100) if paper_trading_data["starting_cash"] > 0 else 0
-
-    return jsonify({
-        "cash": round(paper_trading_data["cash"], 2),
-        "positions_value": round(total_positions_value, 2),
-        "total_value": round(total_value, 2),
-        "starting_value": paper_trading_data["starting_cash"],
-        "total_pl": round(total_pl, 2),
-        "total_return": round(total_return, 2),
-        "positions": positions_list
-    })
+        log_api_request(logger, '/paper/portfolio', 'GET', status='completed')
+        
+        return jsonify({
+            "cash": round(total_cash, 2),
+            "positions_value": round(total_positions_value, 2),
+            "total_value": round(total_portfolio_value, 2),
+            "starting_value": portfolio.starting_cash,
+            "total_pl": round(total_pl, 2),
+            "total_return": round(total_pl_percent, 2),
+            "positions": positions_list
+        })
+        
+    except Exception as e:
+        log_api_error(logger, '/paper/portfolio', e)
+        return jsonify({"error": "Failed to fetch portfolio data"}), 500
 
 
 @app.route('/paper/buy', methods=['POST'])
@@ -419,46 +557,74 @@ def buy_stock():
         if shares <= 0:
             return jsonify({"error": "Shares must be positive"}), 400
 
+        # Get portfolio
+        portfolio = get_default_portfolio()
+        if not portfolio:
+            return jsonify({"error": "No default portfolio found"}), 404
+
+        # Get current price
         stock = yf.Ticker(ticker)
         info = stock.info
-        price = info.get('regularMarketPrice')
-        if price is None or price == 0:
+        price = info.get('regularMarketPrice', 0)
+        if price == 0:
             price = info.get('previousClose', 0)
+        
         if price == 0:
             return jsonify({"error": f"Could not get price for {ticker}"}), 404
 
         total_cost = shares * price
-        if total_cost > paper_trading_data["cash"]:
-            return jsonify({"error": f"Insufficient cash. Need ${total_cost:.2f}, have ${paper_trading_data['cash']:.2f}"}), 400
+        if total_cost > portfolio.current_cash:
+            return jsonify({"error": f"Insufficient cash. Need ${total_cost:.2f}, have ${portfolio.current_cash:.2f}"}), 400
 
-        # Update position
-        pos = paper_trading_data["positions"].get(ticker, {"shares": 0, "avg_cost": 0})
-        new_total_shares = pos["shares"] + shares
-        new_avg_cost = ((pos["avg_cost"] * pos["shares"]) + total_cost) / new_total_shares
+        # Update or create position
+        from database import Position, Trade
+        position = Position.query.filter_by(portfolio_id=portfolio.id, ticker=ticker).first()
+        
+        if position:
+            # Update existing position
+            new_total_shares = position.shares + shares
+            new_avg_cost = ((position.avg_cost * position.shares) + total_cost) / new_total_shares
+            position.shares = new_total_shares
+            position.avg_cost = new_avg_cost
+        else:
+            # Create new position
+            position = Position(
+                portfolio_id=portfolio.id,
+                ticker=ticker,
+                shares=shares,
+                avg_cost=price
+            )
+            db.session.add(position)
 
-        paper_trading_data["positions"][ticker] = {"shares": new_total_shares, "avg_cost": new_avg_cost}
-        paper_trading_data["cash"] -= total_cost
+        # Update cash
+        portfolio.current_cash -= total_cost
 
         # Record trade
-        trade = {
-            "type": "BUY",
-            "ticker": ticker,
-            "shares": shares,
-            "price": price,
-            "total": total_cost,
-            "timestamp": datetime.now().isoformat()
-        }
-        paper_trading_data["trade_history"].append(trade)
+        trade = Trade(
+            portfolio_id=portfolio.id,
+            ticker=ticker,
+            trade_type='BUY',
+            shares=shares,
+            price=price,
+            total=total_cost,
+            notes=f'Bought {shares} shares at ${price:.2f}'
+        )
+        db.session.add(trade)
+
+        db.session.commit()
+
+        log_api_request(logger, '/paper/buy', 'POST', status='completed')
 
         return jsonify({
             "success": True,
             "message": f"Bought {shares} shares of {ticker} at ${price:.2f}",
             "total_cost": round(total_cost, 2),
-            "remaining_cash": round(paper_trading_data["cash"], 2)
+            "remaining_cash": round(portfolio.current_cash, 2)
         }), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        log_api_error(logger, '/paper/buy', e)
+        return jsonify({"error": "Failed to execute buy order"}), 500
 
 
 @app.route('/paper/sell', methods=['POST'])
@@ -481,11 +647,20 @@ def sell_stock():
         if shares <= 0:
             return jsonify({"error": "Shares must be positive"}), 400
 
-        pos = paper_trading_data["positions"].get(ticker)
-        if not pos or pos["shares"] < shares:
-            available = pos["shares"] if pos else 0
+        # Get portfolio
+        portfolio = get_default_portfolio()
+        if not portfolio:
+            return jsonify({"error": "No default portfolio found"}), 404
+
+        # Get position
+        from database import Position, Trade
+        position = Position.query.filter_by(portfolio_id=portfolio.id, ticker=ticker).first()
+        
+        if not position or position.shares < shares:
+            available = position.shares if position else 0
             return jsonify({"error": f"Not enough shares. You have {available}, trying to sell {shares}"}), 400
 
+        # Get current price
         stock = yf.Ticker(ticker)
         info = stock.info
         price = info.get('regularMarketPrice', 0)
@@ -495,60 +670,225 @@ def sell_stock():
             return jsonify({"error": f"Could not get price for {ticker}"}), 404
 
         proceeds = shares * price
-        profit = proceeds - (shares * pos["avg_cost"])
+        profit = proceeds - (shares * position.avg_cost)
         
         # Update position
-        pos["shares"] -= shares
-        if pos["shares"] == 0:
-            del paper_trading_data["positions"][ticker]
+        position.shares -= shares
         
-        paper_trading_data["cash"] += proceeds
+        # Remove position if no shares left
+        if position.shares == 0:
+            db.session.delete(position)
+        
+        # Update cash
+        portfolio.current_cash += proceeds
 
         # Record trade
-        trade = {
-            "type": "SELL",
-            "ticker": ticker,
-            "shares": shares,
-            "price": price,
-            "total": proceeds,
-            "profit": profit,
-            "timestamp": datetime.now().isoformat()
-        }
-        paper_trading_data["trade_history"].append(trade)
+        trade = Trade(
+            portfolio_id=portfolio.id,
+            ticker=ticker,
+            trade_type='SELL',
+            shares=shares,
+            price=price,
+            total=proceeds,
+            notes=f'Sold {shares} shares at ${price:.2f}'
+        )
+        db.session.add(trade)
+
+        db.session.commit()
+
+        log_api_request(logger, '/paper/sell', 'POST', status='completed')
 
         return jsonify({
             "success": True,
             "message": f"Sold {shares} shares of {ticker} at ${price:.2f}",
             "proceeds": round(proceeds, 2),
             "profit": round(profit, 2),
-            "new_cash": round(paper_trading_data["cash"], 2)
+            "new_cash": round(portfolio.current_cash, 2)
         }), 200
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        log_api_error(logger, '/paper/sell', e)
+        return jsonify({"error": "Failed to execute sell order"}), 500
 
 
 @app.route('/paper/history', methods=['GET'])
 def get_trade_history():
     """Get trade history"""
-    return jsonify({
-        "trades": paper_trading_data["trade_history"][-50:]  # Last 50 trades
-    })
+    try:
+        portfolio = get_default_portfolio()
+        if not portfolio:
+            return jsonify({"error": "No default portfolio found"}), 404
+
+        from database import Trade
+        
+        # Get last 50 trades
+        trades = Trade.query.filter_by(portfolio_id=portfolio.id).order_by(Trade.created_at.desc()).limit(50).all()
+        
+        trades_list = []
+        for trade in trades:
+            trades_list.append({
+                "ticker": trade.ticker,
+                "shares": trade.shares,
+                "price": trade.price,
+                "trade_type": trade.trade_type,
+                "timestamp": trade.created_at.isoformat()
+            })
+
+        log_api_request(logger, '/paper/history', 'GET', status='completed')
+        
+        return jsonify({
+            "trades": trades_list
+        })
+        
+    except Exception as e:
+        log_api_error(logger, '/paper/history', e)
+        return jsonify({"error": "Failed to fetch trade history"}), 500
+
+
+@app.route('/paper/analytics', methods=['GET'])
+def get_portfolio_analytics():
+    """Get portfolio performance analytics and history"""
+    try:
+        portfolio = get_default_portfolio()
+        if not portfolio:
+            return jsonify({"error": "No default portfolio found"}), 404
+
+        from database import PortfolioHistory
+        
+        # Get portfolio history (last 30 days)
+        history = PortfolioHistory.query.filter_by(portfolio_id=portfolio.id).order_by(PortfolioHistory.date.desc()).limit(30).all()
+        
+        history_list = []
+        for record in history:
+            history_list.append({
+                "date": record.date.isoformat(),
+                "total_value": record.total_value,
+                "cash_balance": record.cash_balance,
+                "positions_value": record.positions_value,
+                "total_pnl": record.total_pnl,
+                "pnl_percentage": record.pnl_percentage
+            })
+
+        # Calculate performance metrics
+        if len(history_list) >= 2:
+            current_value = history_list[0]["total_value"]
+            previous_value = history_list[1]["total_value"]
+            daily_change = current_value - previous_value
+            daily_change_percent = (daily_change / previous_value * 100) if previous_value > 0 else 0
+            
+            # Weekly change (if available)
+            weekly_change = 0
+            weekly_change_percent = 0
+            if len(history_list) >= 7:
+                weekly_value = history_list[6]["total_value"]
+                weekly_change = current_value - weekly_value
+                weekly_change_percent = (weekly_change / weekly_value * 100) if weekly_value > 0 else 0
+        else:
+            daily_change = 0
+            daily_change_percent = 0
+            weekly_change = 0
+            weekly_change_percent = 0
+
+        # Best and worst performers
+        best_performer = None
+        worst_performer = None
+        best_performance = -float('inf')
+        worst_performance = float('inf')
+        
+        for position in portfolio.positions:
+            try:
+                stock = yf.Ticker(position.ticker)
+                price = stock.info.get('regularMarketPrice', 0)
+                if price == 0:
+                    price = stock.info.get('previousClose', 0)
+                
+                if price > 0:
+                    performance = ((price - position.avg_cost) / position.avg_cost * 100) if position.avg_cost > 0 else 0
+                    
+                    if performance > best_performance:
+                        best_performance = performance
+                        best_performer = {
+                            "ticker": position.ticker,
+                            "performance": round(performance, 2),
+                            "current_price": price,
+                            "avg_cost": position.avg_cost
+                        }
+                    
+                    if performance < worst_performance:
+                        worst_performance = performance
+                        worst_performer = {
+                            "ticker": position.ticker,
+                            "performance": round(performance, 2),
+                            "current_price": price,
+                            "avg_cost": position.avg_cost
+                        }
+            except:
+                continue
+
+        # Update portfolio history for today
+        from database import update_portfolio_history
+        update_portfolio_history(portfolio.id)
+
+        log_api_request(logger, '/paper/analytics', 'GET', status='completed')
+        
+        return jsonify({
+            "history": history_list,
+            "performance": {
+                "daily_change": round(daily_change, 2),
+                "daily_change_percent": round(daily_change_percent, 2),
+                "weekly_change": round(weekly_change, 2),
+                "weekly_change_percent": round(weekly_change_percent, 2),
+                "total_return": round(portfolio.get_pnl_percentage(), 2),
+                "total_pnl": round(portfolio.get_total_pnl(), 2)
+            },
+            "top_performers": {
+                "best": best_performer,
+                "worst": worst_performer
+            },
+            "portfolio_stats": {
+                "total_value": round(portfolio.get_total_value(), 2),
+                "cash_balance": round(portfolio.current_cash, 2),
+                "positions_value": round(portfolio.get_total_value() - portfolio.current_cash, 2),
+                "num_positions": len(portfolio.positions),
+                "num_trades": len(portfolio.trades)
+            }
+        })
+        
+    except Exception as e:
+        log_api_error(logger, '/paper/analytics', e)
+        return jsonify({"error": "Failed to fetch portfolio analytics"}), 500
 
 
 @app.route('/paper/reset', methods=['POST'])
 def reset_portfolio():
     """Reset portfolio to starting state"""
-    paper_trading_data["cash"] = paper_trading_data["starting_cash"]
-    paper_trading_data["positions"] = {}
-    paper_trading_data["trade_history"] = []
-    paper_trading_data["portfolio_history"] = []
-    
-    return jsonify({
-        "success": True,
-        "message": "Portfolio reset to starting state",
-        "starting_cash": paper_trading_data["starting_cash"]
-    })
+    try:
+        portfolio = get_default_portfolio()
+        if not portfolio:
+            return jsonify({"error": "No default portfolio found"}), 404
+
+        # Delete all positions and trades
+        from database import Position, Trade, PortfolioHistory
+        Position.query.filter_by(portfolio_id=portfolio.id).delete()
+        Trade.query.filter_by(portfolio_id=portfolio.id).delete()
+        PortfolioHistory.query.filter_by(portfolio_id=portfolio.id).delete()
+        
+        # Reset cash
+        portfolio.current_cash = portfolio.starting_cash
+        
+        db.session.commit()
+
+        log_api_request(logger, '/paper/reset', 'POST', status='completed')
+        
+        return jsonify({
+            "success": True,
+            "message": "Portfolio reset to starting state",
+            "starting_cash": portfolio.starting_cash
+        })
+        
+    except Exception as e:
+        log_api_error(logger, '/paper/reset', e)
+        return jsonify({"error": "Failed to reset portfolio"}), 500
 
 # --- News Endpoint ---
 
@@ -811,5 +1151,5 @@ def get_fundamentals(ticker):
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=False, port=5001)
 

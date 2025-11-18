@@ -1,6 +1,7 @@
 Flask
 Flask-CORS
 Flask-Limiter
+Flask-SQLAlchemy
 yfinance
 pandas
 python-dotenv

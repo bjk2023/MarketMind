@@ -251,16 +251,16 @@ class RateLimits:
     """Rate limit configurations for different endpoint types"""
     
     # Light endpoints (lists, static data)
-    LIGHT = ["100 per minute", "500 per hour"]
+    LIGHT = "100 per minute"
     
     # Standard endpoints (stock data, predictions)
-    STANDARD = ["50 per minute", "200 per hour"]
+    STANDARD = "50 per minute"
     
     # Heavy endpoints (ML evaluation, backtesting)
-    HEAVY = ["10 per minute", "50 per hour"]
+    HEAVY = "10 per minute"
     
     # Write operations (paper trading, watchlist)
-    WRITE = ["20 per minute", "100 per hour"]
+    WRITE = "20 per minute"
 
 
 # Common validation functions for decorators
