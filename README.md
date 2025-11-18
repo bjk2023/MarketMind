@@ -2,7 +2,17 @@
 
 **Professional Stock Market Prediction & Multi-Asset Analysis Platform**
 
-MarketMind is a comprehensive full-stack financial platform that provides stock market predictions using advanced machine learning models, real-time multi-asset market data, paper trading, fundamental analysis, and professional performance evaluation.
+MarketMind is a comprehensive stock market intelligence platform that provides real-time stock data, AI-powered price predictions, professional backtesting tools, and virtual paper trading capabilities.
+
+### Key Features
+- **🤖 AI-Powered Predictions** - 7-day stock price forecasting using ensemble ML models (Random Forest, XGBoost, Linear Regression)
+- **📊 Professional Backtesting** - Rolling window evaluation with 40+ performance metrics (Sharpe Ratio, Max Drawdown, Returns vs Buy-and-Hold)
+- **💰 Paper Trading** - Virtual portfolio management with persistent data storage
+- **📈 Real-time Data** - Live stock prices, forex rates, cryptocurrency, and commodities
+- **📋 Watchlist Management** - Track multiple stocks with detailed analytics
+- **🔍 Comprehensive Analysis** - 40+ fundamental metrics and technical indicators
+- **🌗 Dark Mode UI** - Modern, responsive interface with dark/light theme support
+- **💾 Database Persistence** - All data stored in SQLite database with migration support
 
 ## 🎯 Features
 
@@ -57,6 +67,12 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
+
+# Initialize database with seed data
+python migrate.py init
+python migrate.py seed
+
+# Start the API server
 python api.py
 ```
 
@@ -143,17 +159,22 @@ Frontend runs on: `http://localhost:3000`
 ```
 MarketMind/
 ├── backend/
-│   ├── api.py                          # Flask API with all endpoints
-│   ├── model.py                        # Linear regression predictor
-│   ├── ensemble_model.py               # RF + XGBoost + Ensemble
+│   ├── api.py                  # Flask API with all endpoints
+│   ├── database.py             # SQLAlchemy database models and utilities
+│   ├── migrate.py              # Database migration and seeding scripts
+│   ├── model.py                # Linear regression predictor
+│   ├── ensemble_model.py       # RF + XGBoost + Ensemble
 │   ├── professional_evaluation.py      # Rolling window backtesting
-│   ├── data_fetcher.py                 # Data pipeline (yfinance + Alpha Vantage)
-│   ├── forex_fetcher.py                # Forex exchange rates
-│   ├── crypto_fetcher.py               # Cryptocurrency prices
-│   ├── commodities_fetcher.py          # Commodity futures data
-│   ├── news_fetcher.py                 # News API integration
-│   ├── requirements.txt                # Python dependencies
-│   └── DATA_SPECS.md                   # Technical specifications
+│   ├── data_fetcher.py         # Data pipeline (yfinance + Alpha Vantage)
+│   ├── forex_fetcher.py        # Forex exchange rates
+│   ├── crypto_fetcher.py       # Cryptocurrency prices
+│   ├── commodities_fetcher.py  # Commodity futures data
+│   ├── news_fetcher.py         # News API integration
+│   ├── security.py             # Rate limiting and input validation
+│   ├── logger_config.py        # Logging configuration
+│   ├── requirements.txt        # Python dependencies
+│   ├── test_db.py              # Database integration tests
+│   └── DATA_SPECS.md           # Technical specifications
 │
 ├── frontend/
 │   ├── src/
@@ -197,6 +218,8 @@ FINNHUB_API_KEY=your_key_here
 ### Backend
 - **Flask** - Web framework
 - **Flask-CORS** - Cross-origin resource sharing
+- **Flask-SQLAlchemy** - Database ORM
+- **Flask-Limiter** - Rate limiting
 - **scikit-learn** - Random Forest, Linear Regression
 - **XGBoost** - Gradient boosting
 - **pandas** - Data manipulation
@@ -205,6 +228,7 @@ FINNHUB_API_KEY=your_key_here
 - **NumPy** - Numerical computing
 - **requests** - HTTP library
 - **python-dotenv** - Environment variables
+- **SQLite** - Database storage
 
 ### Frontend
 - **React** - UI framework
@@ -213,6 +237,40 @@ FINNHUB_API_KEY=your_key_here
 - **lucide-react** - Professional icon system
 - **Axios** - HTTP client
 - **Context API** - State management (Dark mode)
+
+## 💾 Database
+
+MarketMind uses SQLite for persistent data storage with SQLAlchemy ORM. The database includes:
+
+### Database Models
+- **User** - User accounts (demo user for development)
+- **Watchlist** - Stock watchlists with detailed data
+- **Portfolio** - Paper trading portfolios
+- **Position** - Current stock positions in portfolios
+- **Trade** - Complete trade history
+- **Alert** - Price alerts and notifications
+- **PortfolioHistory** - Daily portfolio snapshots for analytics
+
+### Database Operations
+```bash
+# Initialize database
+python migrate.py init
+
+# Reset database (clear all data)
+python migrate.py reset
+
+# Seed with sample data
+python migrate.py seed
+
+# Backup database
+python migrate.py backup
+
+# Restore from backup
+python migrate.py restore backup_file.db
+
+# View database info
+python migrate.py info
+```
 
 ## 📈 Performance
 
