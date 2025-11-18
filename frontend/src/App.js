@@ -3,6 +3,7 @@ import Header from './components/Header';
 import SearchPage from './components/SearchPage';
 import PredictionsPage from './components/PredictionsPage';
 import NewsPage from './components/NewsPage';
+import NotificationsPage from './components/NotificationsPage';
 import GettingStartedPage from './components/GettingStartedPage';
 // NEW: Import the WatchlistPage component
 import WatchlistPage from './components/WatchlistPage';
@@ -17,6 +18,12 @@ import FundamentalsPage from './components/FundamentalsPage';
 function App() {
     // NEW: Add 'watchlist' as a possible page state
     const [activePage, setActivePage] = useState('search');
+
+    // --- NEW: Function to handle clearing alerts ---
+    const handleClearAlerts = () => {
+        // This will be called by NotificationsPage to clear the notification badge
+        console.log("Alerts cleared");
+    };
     const [predictionTicker, setPredictionTicker] = useState('');
 
     const handleNavigateToPredictions = (ticker) => {
@@ -45,6 +52,8 @@ function App() {
                 {activePage === 'crypto' && <CryptoPage />}
                 {activePage === 'commodities' && <CommoditiesPage />}
                 {activePage === 'news' && <NewsPage />}
+                {/* --- THIS IS THE NEW PAGE --- */}
+                {activePage === 'notifications' && <NotificationsPage onClearAlerts={handleClearAlerts} />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
                 {/* NEW: Render the WatchlistPage when active */}
                 {activePage === 'watchlist' && <WatchlistPage />}

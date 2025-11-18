@@ -1,22 +1,57 @@
-import React, { useState } from 'react';
-import { Search, Star, Briefcase, Building2, TrendingUp, Target, Globe, DollarSign, Bitcoin, BarChart3, Newspaper, HelpCircle, Sun, Moon, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Star, Briefcase, Building2, TrendingUp, Target, Globe, DollarSign, Bitcoin, BarChart3, Newspaper, HelpCircle, Bell, Sun, Moon, ChevronDown } from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 
 const Header = ({ activePage, setActivePage }) => {
     const { isDarkMode, toggleDarkMode } = useDarkMode();
     const [showOtherMenu, setShowOtherMenu] = useState(false);
+    
+    // --- NEW: State for notifications ---
+    const [newAlertCount, setNewAlertCount] = useState(0);
+
+    // --- NEW: Function to check for new alerts ---
+    const checkAlerts = () => {
+        fetch('http://127.0.0.1:5001/notifications/triggered')
+            .then(res => res.json())
+            .then(data => {
+                setNewAlertCount(data.length);
+            })
+            .catch(err => console.error("Error fetching alerts:", err));
+    };
+
+    // --- NEW: Poll for alerts every 15 seconds ---
+    useEffect(() => {
+        checkAlerts(); // Check once on load
+        const interval = setInterval(checkAlerts, 15000); // Check every 15 seconds
+        return () => clearInterval(interval);
+    }, []);
+
+    // --- NEW: Clear count when navigating to the page ---
+    const handleNavClick = (pageName) => {
+        if (pageName === 'notifications') {
+            setNewAlertCount(0); // Clear count immediately
+        }
+        setActivePage(pageName);
+    };
     const NavButton = ({ pageName, children }) => {
         const isActive = activePage === pageName;
         return (
             <button
-                onClick={() => setActivePage(pageName)}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap ${
+                onClick={() => handleNavClick(pageName)} // Use new handler
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap relative ${
                     isActive
                         ? 'bg-blue-600 text-white shadow-md'
                         : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                 }`}
             >
                 {children}
+                {/* --- NEW: Red dot logic --- */}
+                {pageName === 'notifications' && newAlertCount > 0 && (
+                    <span className="absolute top-0 right-0 block h-3 w-3 -mt-1 -mr-1">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+                    </span>
+                )}
             </button>
         );
     };
@@ -142,6 +177,12 @@ const Header = ({ activePage, setActivePage }) => {
                             <Newspaper className="w-4 h-4 inline mr-1" />
                             News
                         </NavButton>
+
+                        {/* --- THIS IS THE NEW BUTTON --- */}
+                        <NavButton pageName="notifications">
+                            <Bell className="w-4 h-4 inline" />
+                        </NavButton>
+
                         <NavButton pageName="gettingStarted">
                             <HelpCircle className="w-4 h-4 inline mr-1" />
                             Help
