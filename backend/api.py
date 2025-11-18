@@ -1,5 +1,5 @@
-# To run this file, you need to install Flask, Flask-CORS, yfinance, pandas, scikit-learn, numpy, requests, python-dotenv, statsmodels, finnhub-python, vaderSentiment, and xgboost
-# pip install Flask Flask-CORS yfinance pandas scikit-learn numpy requests python-dotenv statsmodels finnhub-python vaderSentiment xgboost
+# To run this file, you need to install all dependencies:
+# pip install Flask Flask-CORS yfinance pandas scikit-learn numpy requests python-dotenv statsmodels finnhub-python vaderSentiment xgboost schedule
 
 import os
 import yfinance as yf
@@ -11,6 +11,10 @@ from flask_cors import CORS
 from datetime import datetime, timedelta, date
 import json
 import sqlite3
+import schedule
+import time
+import threading
+import uuid  # For unique notification IDs
 
 # --- DOTENV MUST BE FIRST ---
 from dotenv import load_dotenv
@@ -41,12 +45,12 @@ CORS(app)
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
 
-# --- Database Setup (from Jimmy's branch, for history snapshots) ---
+# --- Database Setup (for history snapshots) ---
 DATABASE = 'marketmind.db'
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE, check_same_thread=False)  # Added check_same_thread
+    conn = sqlite3.connect(DATABASE, check_same_thread=False)
     return conn
 
 
@@ -61,7 +65,6 @@ def init_db():
                 portfolio_value REAL NOT NULL
             );
         ''')
-        # We will only insert data when a trade is made, not on init
         conn.commit()
         print("Database initialized.")
     except Exception as e:
@@ -71,8 +74,9 @@ def init_db():
             conn.close()
 
 
-# --- Persistent Storage Setup (from your branch) ---
+# --- Persistent Storage Setup ---
 PORTFOLIO_FILE = 'paper_portfolio.json'
+NOTIFICATIONS_FILE = 'notifications.json'  # <-- NEW FILE FOR ALERTS
 
 
 def load_portfolio():
@@ -81,7 +85,6 @@ def load_portfolio():
         try:
             with open(PORTFOLIO_FILE, 'r') as f:
                 data = json.load(f)
-                # Ensure all keys exist
                 data.setdefault('cash', 100000.0)
                 data.setdefault('starting_cash', 100000.0)
                 data.setdefault('positions', {})
@@ -90,16 +93,10 @@ def load_portfolio():
                 data.setdefault('trade_history', [])
                 return data
         except json.JSONDecodeError:
-            pass  # File is corrupt, reset below
-
-    # Default structure
+            pass
     return {
-        "cash": 100000.0,
-        "starting_cash": 100000.0,
-        "positions": {},
-        "options_positions": {},
-        "transactions": [],
-        "trade_history": []
+        "cash": 100000.0, "starting_cash": 100000.0, "positions": {},
+        "options_positions": {}, "transactions": [], "trade_history": []
     }
 
 
@@ -109,18 +106,38 @@ def save_portfolio(portfolio):
         json.dump(portfolio, f, indent=4)
 
 
-# --- Helper function (from Jimmy's branch) ---
+# --- NEW: Notification Storage ---
+def load_notifications():
+    """Loads notifications from a JSON file."""
+    if os.path.exists(NOTIFICATIONS_FILE):
+        try:
+            with open(NOTIFICATIONS_FILE, 'r') as f:
+                data = json.load(f)
+                data.setdefault('active', [])
+                data.setdefault('triggered', [])
+                return data
+        except json.JSONDecodeError:
+            pass
+    return {"active": [], "triggered": []}
+
+
+def save_notifications(notifications):
+    """Saves notifications to a JSON file."""
+    with open(NOTIFICATIONS_FILE, 'w') as f:
+        json.dump(notifications, f, indent=4)
+
+
+# --- END NEW ---
+
+# --- Helper function ---
 def clean_value(val):
-    if val is None or pd.isna(val):
-        return None
-    if isinstance(val, (np.int64, np.int32, np.int16, np.int8)):
-        return int(val)
-    if isinstance(val, (np.float64, np.float32, np.float16)):
-        return float(val)
+    if val is None or pd.isna(val): return None
+    if isinstance(val, (np.int64, np.int32, np.int16, np.int8)): return int(val)
+    if isinstance(val, (np.float64, np.float32, np.float16)): return float(val)
     return val
 
 
-# --- Helper Function (from Jimmy's branch) ---
+# --- Helper Function ---
 def get_symbol_suggestions(query):
     if not ALPHA_VANTAGE_API_KEY:
         print("Alpha Vantage key not configured. Cannot get suggestions.")
@@ -133,21 +150,18 @@ def get_symbol_suggestions(query):
         formatted_matches = []
         for match in matches:
             if "." not in match.get('1. symbol') and match.get('4. region') == "United States":
-                formatted_matches.append({
-                    "symbol": match.get('1. symbol'),
-                    "name": match.get('2. name')
-                })
+                formatted_matches.append({"symbol": match.get('1. symbol'), "name": match.get('2. name')})
         return formatted_matches
     except Exception as e:
         print(f"Error in get_symbol_suggestions: {e}")
         return []
 
 
-# --- In-memory storage for Watchlist (Shared) ---
+# --- In-memory storage for Watchlist ---
 watchlist = set()
 
 
-# --- Watchlist Endpoints (Shared) ---
+# --- Watchlist Endpoints ---
 @app.route('/watchlist', methods=['GET'])
 def get_watchlist():
     return jsonify(list(watchlist))
@@ -167,29 +181,25 @@ def remove_from_watchlist(ticker):
     return jsonify({"message": f"{ticker} removed from watchlist.", "watchlist": list(watchlist)})
 
 
-# --- Stock Data Endpoint (Advanced version from Jimmy's branch) ---
+# --- Stock Data Endpoint ---
 @app.route('/stock/<string:ticker>')
 def get_stock_data(ticker):
     try:
         sanitized_ticker = ticker.split(':')[0]
         stock = yf.Ticker(sanitized_ticker)
         info = stock.info
-
         if info.get('regularMarketPrice') is None:
             return jsonify({"error": f"Invalid ticker symbol '{ticker}' or no data available."}), 404
-
         price = info.get('regularMarketPrice', 0)
         previous_close = info.get('previousClose', price)
         change = price - previous_close
         change_percent = (change / previous_close) * 100 if previous_close else 0
-
         market_cap_int = info.get('marketCap', 0)
         market_cap_formatted = "N/A"
         if market_cap_int >= 1_000_000_000_000:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000_000:.2f}T"
         elif market_cap_int > 0:
             market_cap_formatted = f"{market_cap_int / 1_000_000_000:.2f}B"
-
         sparkline = []
         try:
             hist = stock.history(period="7d", interval="1d")
@@ -197,18 +207,13 @@ def get_stock_data(ticker):
                 sparkline = [clean_value(p) for p in hist['Close']]
         except Exception as e:
             print(f"Could not fetch sparkline data: {e}")
-
-        # Use AlphaVantage for fundamentals if key exists
         fundamentals = {}
         if not ALPHA_VANTAGE_API_KEY:
-            print("ALPHA_VANTAGE_API_KEY not set. Falling back to yfinance.")
             fundamentals = {
-                "peRatio": clean_value(info.get('trailingPE')),
-                "week52High": clean_value(info.get('fiftyTwoWeekHigh')),
+                "peRatio": clean_value(info.get('trailingPE')), "week52High": clean_value(info.get('fiftyTwoWeekHigh')),
                 "week52Low": clean_value(info.get('fiftyTwoWeekLow')),
                 "analystTargetPrice": clean_value(info.get('targetMeanPrice')),
-                "recommendationKey": info.get('recommendationKey'),
-                "overview": info.get('longBusinessSummary')
+                "recommendationKey": info.get('recommendationKey'), "overview": info.get('longBusinessSummary')
             }
         else:
             try:
@@ -217,16 +222,12 @@ def get_stock_data(ticker):
                 data = r.json()
                 if data and 'Symbol' in data:
                     fundamentals = {
-                        "overview": data.get("Description", "N/A"),
-                        "peRatio": clean_value(data.get("PERatio")),
-                        "forwardPE": clean_value(data.get("ForwardPE")),
-                        "pegRatio": clean_value(data.get("PEGRatio")),
-                        "dividendYield": clean_value(data.get("DividendYield")),
-                        "beta": clean_value(data.get("Beta")),
+                        "overview": data.get("Description", "N/A"), "peRatio": clean_value(data.get("PERatio")),
+                        "forwardPE": clean_value(data.get("ForwardPE")), "pegRatio": clean_value(data.get("PEGRatio")),
+                        "dividendYield": clean_value(data.get("DividendYield")), "beta": clean_value(data.get("Beta")),
                         "week52High": clean_value(data.get("52WeekHigh")),
                         "week52Low": clean_value(data.get("52WeekLow")),
-                        "analystTargetPrice": clean_value(data.get("AnalystTargetPrice")),
-                        "recommendationKey": "N/A"
+                        "analystTargetPrice": clean_value(data.get("AnalystTargetPrice")), "recommendationKey": "N/A"
                     }
                 else:
                     raise Exception("No data from Alpha Vantage")
@@ -237,88 +238,62 @@ def get_stock_data(ticker):
                     "week52High": clean_value(info.get('fiftyTwoWeekHigh')),
                     "week52Low": clean_value(info.get('fiftyTwoWeekLow')),
                     "analystTargetPrice": clean_value(info.get('targetMeanPrice')),
-                    "recommendationKey": info.get('recommendationKey'),
-                    "overview": info.get('longBusinessSummary')
+                    "recommendationKey": info.get('recommendationKey'), "overview": info.get('longBusinessSummary')
                 }
-
         formatted_data = {
-            "symbol": info.get('symbol', ticker.upper()),
-            "companyName": info.get('longName', 'N/A'),
-            "price": clean_value(price),
-            "change": clean_value(change),
-            "changePercent": clean_value(change_percent),
-            "marketCap": market_cap_formatted,
-            "sparkline": sparkline,
-            "fundamentals": fundamentals
+            "symbol": info.get('symbol', ticker.upper()), "companyName": info.get('longName', 'N/A'),
+            "price": clean_value(price), "change": clean_value(change),
+            "changePercent": clean_value(change_percent), "marketCap": market_cap_formatted,
+            "sparkline": sparkline, "fundamentals": fundamentals
         }
         return jsonify(formatted_data)
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-# --- Chart Endpoint (Advanced version from Jimmy's branch) ---
+# --- Chart Endpoint ---
 @app.route('/chart/<string:ticker>')
 def get_chart_data(ticker):
     period = request.args.get('period', '6mo')
     sanitized_ticker = ticker.split(':')[0]
-
     period_interval_map = {
-        "1d": {"period": "1d", "interval": "5m"},
-        "5d": {"period": "5d", "interval": "15m"},
-        "14d": {"period": "14d", "interval": "1d"},
-        "1mo": {"period": "1mo", "interval": "1d"},
-        "6mo": {"period": "6mo", "interval": "1d"},
-        "1y": {"period": "1y", "interval": "1d"},
+        "1d": {"period": "1d", "interval": "5m"}, "5d": {"period": "5d", "interval": "15m"},
+        "14d": {"period": "14d", "interval": "1d"}, "1mo": {"period": "1mo", "interval": "1d"},
+        "6mo": {"period": "6mo", "interval": "1d"}, "1y": {"period": "1y", "interval": "1d"},
     }
     params = period_interval_map.get(period)
-    if not params:
-        return jsonify({"error": "Invalid time frame specified."}), 400
-
+    if not params: return jsonify({"error": "Invalid time frame specified."}), 400
     try:
         stock = yf.Ticker(sanitized_ticker)
         hist = stock.history(period=params["period"], interval=params["interval"])
-        if hist.empty:
-            return jsonify({"error": "Could not retrieve time series data."}), 404
-
+        if hist.empty: return jsonify({"error": "Could not retrieve time series data."}), 404
         chart_data = []
         for index, row in hist.iterrows():
             chart_data.append({
-                "date": index.strftime('%Y-%m-%d %H:%M:%S'),
-                "open": clean_value(row['Open']),
-                "high": clean_value(row['High']),
-                "low": clean_value(row['Low']),
-                "close": clean_value(row['Close']),
-                "volume": clean_value(row['Volume'])
+                "date": index.strftime('%Y-%m-%d %H:%M:%S'), "open": clean_value(row['Open']),
+                "high": clean_value(row['High']), "low": clean_value(row['Low']),
+                "close": clean_value(row['Close']), "volume": clean_value(row['Volume'])
             })
-
-        # Try to append Tazeem's prediction data to the chart
         try:
-            # Note: This calls the /predict endpoint defined below
             predictions = predict_stock(sanitized_ticker).get_json()['predictions']
             for pred in predictions:
                 chart_data.append({
-                    "date": pred["date"] + " 00:00:00",
-                    "open": None, "high": None, "low": None,
-                    "close": pred["predictedClose"],
-                    "volume": None
+                    "date": pred["date"] + " 00:00:00", "open": None, "high": None, "low": None,
+                    "close": pred["predictedClose"], "volume": None
                 })
         except Exception as e:
             print(f"Could not append prediction to chart: {e}")
-
         return jsonify(chart_data)
-
     except Exception as e:
         return jsonify({"error": f"An error occurred while fetching chart data: {str(e)}"}), 500
 
 
-# --- News Endpoint (from Jimmy's branch) ---
+# --- News Endpoint ---
 @app.route('/news')
 def get_query_news():
     query = request.args.get('q')
-    if not query:
-        return jsonify({"error": "A search query ('q') is required."}), 400
-    if not NEWS_API_KEY:
-        return jsonify({"error": "NewsAPI key is not configured"}), 500
+    if not query: return jsonify({"error": "A search query ('q') is required."}), 400
+    if not NEWS_API_KEY: return jsonify({"error": "NewsAPI key is not configured"}), 500
     try:
         url = (f"https://newsapi.org/v2/everything?"
                f"q={query}&searchIn=title,description&language=en&pageSize=8"
@@ -327,21 +302,15 @@ def get_query_news():
         data = response.json()
         if data.get('status') != 'ok':
             return jsonify({"error": data.get('message', 'Failed to fetch news')}), 500
-        formatted_news = []
-        for item in data.get('articles', []):
-            formatted_news.append({
-                'title': item.get('title'),
-                'publisher': item.get('source', {}).get('name', 'N/A'),
-                'link': item.get('url'),
-                'publishTime': item.get('publishedAt', 'N/A'),
-                'thumbnail_url': item.get('urlToImage')
-            })
+        formatted_news = [{'title': item.get('title'), 'publisher': item.get('source', {}).get('name', 'N/A'),
+                           'link': item.get('url'), 'publishTime': item.get('publishedAt', 'N/A'),
+                           'thumbnail_url': item.get('urlToImage')} for item in data.get('articles', [])]
         return jsonify(formatted_news)
     except Exception as e:
         return jsonify({"error": f"An error occurred while fetching news: {str(e)}"}), 500
 
 
-# --- Options Endpoints (from Jimmy's branch) ---
+# --- Options Endpoints ---
 @app.route('/options/stock_price/<string:ticker>')
 def get_options_stock_price(ticker):
     try:
@@ -361,8 +330,7 @@ def get_option_expirations(ticker):
         sanitized_ticker = ticker.split(':')[0]
         stock = yf.Ticker(sanitized_ticker)
         expirations = stock.options
-        if not expirations:
-            return jsonify({"error": "No options found for this ticker."}), 404
+        if not expirations: return jsonify({"error": "No options found for this ticker."}), 404
         return jsonify(list(expirations))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -371,8 +339,7 @@ def get_option_expirations(ticker):
 @app.route('/options/chain/<string:ticker>', methods=['GET'])
 def get_option_chain(ticker):
     date = request.args.get('date')
-    if not date:
-        return jsonify({"error": "A date query parameter is required."}), 400
+    if not date: return jsonify({"error": "A date query parameter is required."}), 400
     try:
         sanitized_ticker = ticker.split(':')[0]
         stock = yf.Ticker(sanitized_ticker)
@@ -393,31 +360,27 @@ def get_option_chain(ticker):
                     record[col] = clean_value(record.get(col))
             return records
 
-        return jsonify({
-            "calls": format_chain(chain.calls),
-            "puts": format_chain(chain.puts),
-            "stock_price": clean_value(price)
-        })
+        return jsonify(
+            {"calls": format_chain(chain.calls), "puts": format_chain(chain.puts), "stock_price": clean_value(price)})
     except Exception as e:
         print(f"Error getting option chain: {e}")
         return jsonify({"error": "Could not retrieve option chain for this date."}), 404
 
 
-# --- Options Suggestion Endpoint (from Jimmy's branch) ---
+# --- Options Suggestion Endpoint ---
 @app.route('/options/suggest/<string:ticker>', methods=['GET'])
 def get_option_suggestion(ticker):
     try:
         sanitized_ticker = ticker.split(':')[0].upper()
         suggestion = generate_suggestion(sanitized_ticker)
-        if "error" in suggestion:
-            return jsonify(suggestion), 404
+        if "error" in suggestion: return jsonify(suggestion), 404
         return jsonify(suggestion)
     except Exception as e:
         print(f"Error in suggestion endpoint for {ticker}: {e}")
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-# --- Tazeem's ML Endpoints (from Jimmy's branch) ---
+# --- ML Endpoints ---
 @app.route('/predict/<string:ticker>')
 def predict_stock(ticker):
     try:
@@ -425,8 +388,7 @@ def predict_stock(ticker):
         stock = yf.Ticker(sanitized_ticker)
         info = stock.info
         df = create_dataset(sanitized_ticker, period="15d")
-        if df.empty:
-            return jsonify({"error": "No historical data available."}), 404
+        if df.empty: return jsonify({"error": "No historical data available."}), 404
         current_df = estimate_week(df)
         prediction_df = current_df.tail(6)
         recent_close_df = df[df["Close"].notna()].tail(1)
@@ -434,15 +396,11 @@ def predict_stock(ticker):
         recent_date = recent_close_df.index[0] if not recent_close_df.empty else current_df.index[0]
         recent_predicted = current_df["Predicted"].iloc[0]
         response = {
-            "symbol": info.get('symbol', ticker.upper()),
-            "companyName": info.get('longName', 'N/A'),
-            "recentDate": recent_date.strftime('%Y-%m-%d'),
-            "recentClose": round(float(recent_close), 2),
+            "symbol": info.get('symbol', ticker.upper()), "companyName": info.get('longName', 'N/A'),
+            "recentDate": recent_date.strftime('%Y-%m-%d'), "recentClose": round(float(recent_close), 2),
             "recentPredicted": round(float(recent_predicted), 2),
-            "predictions": [
-                {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(float(pred), 2)}
-                for date, pred in zip(prediction_df.index, prediction_df["Predicted"])
-            ]
+            "predictions": [{"date": date.strftime('%Y-%m-%d'), "predictedClose": round(float(pred), 2)}
+                            for date, pred in zip(prediction_df.index, prediction_df["Predicted"])]
         }
         return jsonify(response)
     except Exception as e:
@@ -457,31 +415,21 @@ def predict_ensemble(ticker):
         stock = yf.Ticker(sanitized_ticker)
         info = stock.info
         df = create_dataset(sanitized_ticker, period="1y")
-        if df.empty or len(df) < 30:
-            return jsonify({"error": "Insufficient historical data."}), 404
+        if df.empty or len(df) < 30: return jsonify({"error": "Insufficient historical data."}), 404
         ensemble_preds, individual_preds = ensemble_predict(df, days_ahead=6)
-        if ensemble_preds is None:
-            return jsonify({"error": "Ensemble prediction failed."}), 500
+        if ensemble_preds is None: return jsonify({"error": "Ensemble prediction failed."}), 500
         recent_close = float(df["Close"].iloc[-1])
         recent_date = df.index[-1]
         future_dates = [recent_date + pd.Timedelta(days=i + 1) for i in range(6)]
-
         response = {
-            "symbol": info.get('symbol', ticker.upper()),
-            "companyName": info.get('longName', 'N/A'),
-            "recentDate": recent_date.strftime('%Y-%m-%d'),
-            "recentClose": round(recent_close, 2),
+            "symbol": info.get('symbol', ticker.upper()), "companyName": info.get('longName', 'N/A'),
+            "recentDate": recent_date.strftime('%Y-%m-%d'), "recentClose": round(recent_close, 2),
             "recentPredicted": round(float(ensemble_preds[0]), 2),
-            "predictions": [
-                {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(float(pred), 2)}
-                for date, pred in zip(future_dates, ensemble_preds)
-            ],
-            "modelBreakdown": {
-                model_name: [round(float(p), 2) for p in preds]
-                for model_name, preds in individual_preds.items()
-            },
-            "modelsUsed": list(individual_preds.keys()),
-            "ensembleMethod": "weighted_average",
+            "predictions": [{"date": date.strftime('%Y-%m-%d'), "predictedClose": round(float(pred), 2)}
+                            for date, pred in zip(future_dates, ensemble_preds)],
+            "modelBreakdown": {model_name: [round(float(p), 2) for p in preds]
+                               for model_name, preds in individual_preds.items()},
+            "modelsUsed": list(individual_preds.keys()), "ensembleMethod": "weighted_average",
             "confidence": round(95.0 - (np.std(list(individual_preds.values())) * 2), 1) if len(
                 individual_preds) > 1 else 85.0
         }
@@ -491,23 +439,14 @@ def predict_ensemble(ticker):
         return jsonify({"error": f"Ensemble prediction failed: {str(e)}"}), 500
 
 
-# --- Paper Trading Endpoints (Merged) ---
+# --- Paper Trading Endpoints (Using JSON persistence) ---
 
-# We use Jimmy's snapshot function but make it use the JSON file
 def record_portfolio_snapshot(portfolio_data):
     total_value = portfolio_data['cash']
-
-    # Add stock position value
     for ticker, pos in portfolio_data.get("positions", {}).items():
-        try:
-            total_value += pos['shares'] * pos['avg_cost']
-        except Exception:
-            pass  # ignore
-
-    # Add options position value
+        total_value += pos['shares'] * pos['avg_cost']
     for contract, pos in portfolio_data.get("options_positions", {}).items():
-        total_value += pos['quantity'] * pos['avg_cost'] * 100  # *100 for options
-
+        total_value += pos['quantity'] * pos['avg_cost'] * 100
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -517,65 +456,50 @@ def record_portfolio_snapshot(portfolio_data):
     except Exception as e:
         print(f"Failed to record portfolio snapshot: {e}")
     finally:
-        if conn:
-            conn.close()
+        if conn: conn.close()
 
 
-# This is your advanced portfolio endpoint, using your JSON file
 @app.route('/paper/portfolio', methods=['GET'])
 def get_paper_portfolio():
     portfolio = load_portfolio()
     positions = portfolio.get("positions", {})
     options_positions = portfolio.get("options_positions", {})
-
     total_positions_value = 0
     total_cost_basis_stocks = 0
     total_daily_pl_stocks = 0
     positions_list = []
-
     tickers_to_fetch = list(positions.keys())
-
     if tickers_to_fetch:
         try:
             data = yf.download(tickers_to_fetch, period="2d")
             if not data.empty:
                 current_prices = data['Close'].iloc[-1]
                 prev_close_prices = data['Close'].iloc[0]
-
                 for ticker, pos in positions.items():
-                    shares = float(pos["shares"])
+                    shares = float(pos["shares"]);
                     avg_cost = float(pos["avg_cost"])
-
                     if len(tickers_to_fetch) == 1:
-                        current_price = float(current_prices)
+                        current_price = float(current_prices);
                         prev_close = float(prev_close_prices)
                     else:
-                        current_price = float(current_prices.get(ticker, 0))
+                        current_price = float(current_prices.get(ticker, 0));
                         prev_close = float(prev_close_prices.get(ticker, 0))
-
-                    if pd.isna(current_price) or current_price == 0:
-                        current_price = avg_cost  # Use avg cost if price is bad
-                    if pd.isna(prev_close):
-                        prev_close = current_price
-
-                    cost_basis = shares * avg_cost
+                    if pd.isna(current_price) or current_price == 0: current_price = avg_cost
+                    if pd.isna(prev_close): prev_close = current_price
+                    cost_basis = shares * avg_cost;
                     current_value = shares * current_price
                     total_pl = current_value - cost_basis
                     total_pl_percent = (total_pl / cost_basis * 100) if cost_basis > 0 else 0
                     daily_pl = shares * (current_price - prev_close)
                     daily_pl_percent = ((current_price - prev_close) / prev_close * 100) if prev_close > 0 else 0
-
-                    total_positions_value += current_value
+                    total_positions_value += current_value;
                     total_cost_basis_stocks += cost_basis
                     total_daily_pl_stocks += daily_pl
-
                     positions_list.append({
-                        "ticker": ticker,
-                        "company_name": yf.Ticker(ticker).info.get('longName', 'N/A'),
-                        "shares": shares, "avg_cost": round(avg_cost, 2),
-                        "current_price": round(current_price, 2), "current_value": round(current_value, 2),
-                        "cost_basis": round(cost_basis, 2), "total_pl": round(total_pl, 2),
-                        "total_pl_percent": round(total_pl_percent, 2),
+                        "ticker": ticker, "company_name": yf.Ticker(ticker).info.get('longName', 'N/A'),
+                        "shares": shares, "avg_cost": round(avg_cost, 2), "current_price": round(current_price, 2),
+                        "current_value": round(current_value, 2), "cost_basis": round(cost_basis, 2),
+                        "total_pl": round(total_pl, 2), "total_pl_percent": round(total_pl_percent, 2),
                         "daily_pl": round(daily_pl, 2), "daily_pl_percent": round(daily_pl_percent, 2),
                         "isOption": False
                     })
@@ -583,266 +507,183 @@ def get_paper_portfolio():
             print(f"Error processing stock positions: {e}")
             for ticker, pos in positions.items():
                 positions_list.append({
-                    "ticker": ticker, "company_name": "N/A (Error fetching)",
-                    "shares": pos["shares"], "avg_cost": round(pos["avg_cost"], 2),
-                    "current_price": round(pos["avg_cost"], 2),
+                    "ticker": ticker, "company_name": "N/A (Error fetching)", "shares": pos["shares"],
+                    "avg_cost": round(pos["avg_cost"], 2), "current_price": round(pos["avg_cost"], 2),
                     "current_value": round(pos["shares"] * pos["avg_cost"], 2),
-                    "cost_basis": round(pos["shares"] * pos["avg_cost"], 2), "total_pl": 0, "total_pl_percent": 0,
-                    "daily_pl": 0, "daily_pl_percent": 0, "isOption": False
+                    "cost_basis": round(pos["shares"] * pos["avg_cost"], 2),
+                    "total_pl": 0, "total_pl_percent": 0, "daily_pl": 0, "daily_pl_percent": 0, "isOption": False
                 })
-
-    # Process Options Positions
     options_positions_list = []
     total_options_value = 0
-
     for contract_symbol, pos in options_positions.items():
-        # yfinance is unreliable for options, so we'll just use stored cost
-        current_price = pos["avg_cost"]
+        current_price = pos["avg_cost"];
         current_value = pos["quantity"] * current_price * 100
         cost_basis = pos["quantity"] * pos["avg_cost"] * 100
-        total_pl = current_value - cost_basis
-
+        total_pl = current_value - cost_basis;
         total_options_value += current_value
-
         options_positions_list.append({
-            "ticker": contract_symbol, "company_name": contract_symbol,
-            "shares": pos["quantity"], "avg_cost": round(pos["avg_cost"], 2),
-            "current_price": round(current_price, 2), "current_value": round(current_value, 2),
-            "cost_basis": round(cost_basis, 2), "total_pl": round(total_pl, 2),
-            "total_pl_percent": 0, "daily_pl": 0, "daily_pl_percent": 0,
+            "ticker": contract_symbol, "company_name": contract_symbol, "shares": pos["quantity"],
+            "avg_cost": round(pos["avg_cost"], 2), "current_price": round(current_price, 2),
+            "current_value": round(current_value, 2), "cost_basis": round(cost_basis, 2),
+            "total_pl": round(total_pl, 2), "total_pl_percent": 0, "daily_pl": 0, "daily_pl_percent": 0,
             "isOption": True
         })
-
-    # Combine Totals
     total_portfolio_value = portfolio["cash"] + total_positions_value + total_options_value
     total_pl = total_portfolio_value - portfolio.get("starting_cash", 100000.0)
     total_return = (total_pl / portfolio.get("starting_cash", 100000.0) * 100) if portfolio.get("starting_cash",
                                                                                                 100000.0) > 0 else 0
-
     return jsonify({
-        "cash": round(portfolio["cash"], 2),
-        "positions_value": round(total_positions_value, 2),
-        "options_value": round(total_options_value, 2),
-        "total_value": round(total_portfolio_value, 2),
-        "starting_value": portfolio.get("starting_cash", 100000.0),
-        "total_pl": round(total_pl, 2),
-        "total_return": round(total_return, 2),
-        "positions": positions_list,
+        "cash": round(portfolio["cash"], 2), "positions_value": round(total_positions_value, 2),
+        "options_value": round(total_options_value, 2), "total_value": round(total_portfolio_value, 2),
+        "starting_value": portfolio.get("starting_cash", 100000.0), "total_pl": round(total_pl, 2),
+        "total_return": round(total_return, 2), "positions": positions_list,
         "options_positions": options_positions_list
     })
 
 
-# This is your stock 'buy' endpoint, modified to use JSON
 @app.route('/paper/buy', methods=['POST'])
 def buy_stock():
     portfolio = load_portfolio()
     try:
-        data = request.get_json()
-        ticker = data.get('ticker', '').upper()
+        data = request.get_json();
+        ticker = data.get('ticker', '').upper();
         shares = float(data.get('shares', 0))
-        if shares <= 0:
-            return jsonify({"error": "Shares must be positive"}), 400
-
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        if shares <= 0: return jsonify({"error": "Shares must be positive"}), 400
+        stock = yf.Ticker(ticker);
+        info = stock.info;
         price = info.get('regularMarketPrice')
         if price is None or price == 0: price = info.get('previousClose', 0)
         if price is None or price == 0: return jsonify({"error": f"Could not get price for {ticker}"}), 404
-
         total_cost = shares * price
         if total_cost > portfolio["cash"]:
             return jsonify({"error": f"Insufficient cash. Need ${total_cost:.2f}, have ${portfolio['cash']:.2f}"}), 400
-
         pos = portfolio["positions"].get(ticker, {"shares": 0, "avg_cost": 0})
         new_total_shares = pos["shares"] + shares
         new_avg_cost = ((pos["avg_cost"] * pos["shares"]) + total_cost) / new_total_shares
-
         portfolio["positions"][ticker] = {"shares": new_total_shares, "avg_cost": new_avg_cost}
         portfolio["cash"] -= total_cost
-
-        trade = {
-            "type": "BUY", "ticker": ticker, "shares": shares, "price": price,
-            "total": total_cost, "timestamp": datetime.now().isoformat()
-        }
+        trade = {"type": "BUY", "ticker": ticker, "shares": shares, "price": price, "total": total_cost,
+                 "timestamp": datetime.now().isoformat()}
         portfolio["trade_history"].append(trade)
-        portfolio["transactions"].append({  # For your YTD chart
-            "date": datetime.now().strftime('%Y-%m-%d'), "type": "BUY", "ticker": ticker,
-            "shares": shares, "price": price, "total": total_cost
-        })
-
+        portfolio["transactions"].append(
+            {"date": datetime.now().strftime('%Y-%m-%d'), "type": "BUY", "ticker": ticker, "shares": shares,
+             "price": price, "total": total_cost})
         save_portfolio(portfolio)
-        record_portfolio_snapshot(portfolio)  # Record snapshot in SQLite
-
-        return jsonify({
-            "success": True, "message": f"Bought {shares} shares of {ticker} at ${price:.2f}",
-            "total_cost": round(total_cost, 2), "remaining_cash": round(portfolio["cash"], 2)
-        }), 200
+        record_portfolio_snapshot(portfolio)
+        return jsonify({"success": True, "message": f"Bought {shares} shares of {ticker} at ${price:.2f}"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# This is your stock 'sell' endpoint, modified to use JSON
 @app.route('/paper/sell', methods=['POST'])
 def sell_stock():
     portfolio = load_portfolio()
     try:
-        data = request.get_json()
-        ticker = data.get('ticker', '').upper()
+        data = request.get_json();
+        ticker = data.get('ticker', '').upper();
         shares = float(data.get('shares', 0))
-        if shares <= 0:
-            return jsonify({"error": "Shares must be positive"}), 400
-
+        if shares <= 0: return jsonify({"error": "Shares must be positive"}), 400
         pos = portfolio["positions"].get(ticker)
         if not pos or pos["shares"] < shares:
-            available = pos["shares"] if pos else 0
-            return jsonify({"error": f"Not enough shares. You have {available}, trying to sell {shares}"}), 400
-
-        stock = yf.Ticker(ticker)
-        info = stock.info
+            return jsonify(
+                {"error": f"Not enough shares. You have {pos.get('shares', 0)}, trying to sell {shares}"}), 400
+        stock = yf.Ticker(ticker);
+        info = stock.info;
         price = info.get('regularMarketPrice')
         if price is None or price == 0: price = info.get('previousClose', 0)
         if price is None or price == 0: return jsonify({"error": f"Could not get price for {ticker}"}), 404
-
-        proceeds = shares * price
+        proceeds = shares * price;
         profit = proceeds - (shares * pos["avg_cost"])
-
         pos["shares"] -= shares
-        if pos["shares"] == 0:
-            del portfolio["positions"][ticker]
-
+        if pos["shares"] == 0: del portfolio["positions"][ticker]
         portfolio["cash"] += proceeds
-
-        trade = {
-            "type": "SELL", "ticker": ticker, "shares": shares, "price": price,
-            "total": proceeds, "profit": profit, "timestamp": datetime.now().isoformat()
-        }
+        trade = {"type": "SELL", "ticker": ticker, "shares": shares, "price": price, "total": proceeds,
+                 "profit": profit, "timestamp": datetime.now().isoformat()}
         portfolio["trade_history"].append(trade)
-        portfolio["transactions"].append({  # For your YTD chart
-            "date": datetime.now().strftime('%Y-%m-%d'), "type": "SELL", "ticker": ticker,
-            "shares": shares, "price": price, "total": proceeds
-        })
-
+        portfolio["transactions"].append(
+            {"date": datetime.now().strftime('%Y-%m-%d'), "type": "SELL", "ticker": ticker, "shares": shares,
+             "price": price, "total": proceeds})
         save_portfolio(portfolio)
-        record_portfolio_snapshot(portfolio)  # Record snapshot in SQLite
-
-        return jsonify({
-            "success": True, "message": f"Sold {shares} shares of {ticker} at ${price:.2f}",
-            "proceeds": round(proceeds, 2), "profit": round(profit, 2),
-            "new_cash": round(portfolio["cash"], 2)
-        }), 200
+        record_portfolio_snapshot(portfolio)
+        return jsonify({"success": True, "message": f"Sold {shares} shares of {ticker} at ${price:.2f}",
+                        "profit": round(profit, 2)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# This is Jimmy's options 'buy' endpoint, modified to use JSON
 @app.route('/paper/options/buy', methods=['POST'])
 def buy_option():
     portfolio = load_portfolio()
     try:
-        data = request.get_json()
-        contract_symbol = data.get('contractSymbol')
-        quantity = int(data.get('quantity', 0))
-        price = float(data.get('price', 0))  # This is the "ask" price (premium)
-
+        data = request.get_json();
+        contract_symbol = data.get('contractSymbol');
+        quantity = int(data.get('quantity', 0));
+        price = float(data.get('price', 0))
         if quantity <= 0: return jsonify({"error": "Quantity must be positive"}), 400
         if price == 0: return jsonify({"error": "Cannot buy an option with no premium."}), 400
-
         total_cost = quantity * price * 100
-
         if total_cost > portfolio["cash"]:
             return jsonify({"error": f"Insufficient cash. Need ${total_cost:.2f}, have ${portfolio['cash']:.2f}"}), 400
-
         pos = portfolio["options_positions"].get(contract_symbol, {"quantity": 0, "avg_cost": 0})
         new_total_quantity = pos["quantity"] + quantity
         new_avg_cost = ((pos["avg_cost"] * pos["quantity"]) + (price * quantity)) / new_total_quantity
-
         portfolio["options_positions"][contract_symbol] = {"quantity": new_total_quantity, "avg_cost": new_avg_cost}
         portfolio["cash"] -= total_cost
-
-        trade = {
-            "type": "BUY_OPTION", "ticker": contract_symbol, "shares": quantity, "price": price,
-            "total": total_cost, "timestamp": datetime.now().isoformat()
-        }
+        trade = {"type": "BUY_OPTION", "ticker": contract_symbol, "shares": quantity, "price": price,
+                 "total": total_cost, "timestamp": datetime.now().isoformat()}
         portfolio["trade_history"].append(trade)
-        # Note: Your /paper/history (YTD) chart does not support options yet.
-
         save_portfolio(portfolio)
         record_portfolio_snapshot(portfolio)
-
-        return jsonify({
-            "success": True, "message": f"Bought {quantity} {contract_symbol} contract(s) at ${price:.2f}",
-            "remaining_cash": round(portfolio["cash"], 2)
-        }), 200
+        return jsonify(
+            {"success": True, "message": f"Bought {quantity} {contract_symbol} contract(s) at ${price:.2f}"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# This is Jimmy's options 'sell' endpoint, modified to use JSON
 @app.route('/paper/options/sell', methods=['POST'])
 def sell_option():
     portfolio = load_portfolio()
     try:
-        data = request.get_json()
-        contract_symbol = data.get('contractSymbol')
-        quantity = int(data.get('quantity', 0))
-        price = float(data.get('price', 0))  # This is the "bid" price (premium)
-
+        data = request.get_json();
+        contract_symbol = data.get('contractSymbol');
+        quantity = int(data.get('quantity', 0));
+        price = float(data.get('price', 0))
         if quantity <= 0: return jsonify({"error": "Quantity must be positive"}), 400
         if price == 0: return jsonify({"error": "Cannot sell an option for no premium."}), 400
-
         pos = portfolio["options_positions"].get(contract_symbol)
         if not pos or pos["quantity"] < quantity:
-            available = pos["quantity"] if pos else 0
-            return jsonify({"error": f"Not enough contracts. You have {available}, trying to sell {quantity}"}), 400
-
+            return jsonify(
+                {"error": f"Not enough contracts. You have {pos.get('quantity', 0)}, trying to sell {quantity}"}), 400
         proceeds = quantity * price * 100
         profit = proceeds - (quantity * pos["avg_cost"] * 100)
-
         pos["quantity"] -= quantity
-        if pos["quantity"] == 0:
-            del portfolio["options_positions"][contract_symbol]
-
+        if pos["quantity"] == 0: del portfolio["options_positions"][contract_symbol]
         portfolio["cash"] += proceeds
-
-        trade = {
-            "type": "SELL_OPTION", "ticker": contract_symbol, "shares": quantity, "price": price,
-            "total": proceeds, "profit": profit, "timestamp": datetime.now().isoformat()
-        }
+        trade = {"type": "SELL_OPTION", "ticker": contract_symbol, "shares": quantity, "price": price,
+                 "total": proceeds, "profit": profit, "timestamp": datetime.now().isoformat()}
         portfolio["trade_history"].append(trade)
-
         save_portfolio(portfolio)
         record_portfolio_snapshot(portfolio)
-
-        return jsonify({
-            "success": True, "message": f"Sold {quantity} {contract_symbol} contract(s) at ${price:.2f}",
-            "profit": round(profit, 2), "new_cash": round(portfolio["cash"], 2)
-        }), 200
+        return jsonify({"success": True, "message": f"Sold {quantity} {contract_symbol} contract(s) at ${price:.2f}",
+                        "profit": round(profit, 2)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# --- THIS IS YOUR CORRECTED PORTFOLIO HISTORY ENDPOINT ---
+# --- This is YOUR corrected portfolio history endpoint ---
 @app.route('/paper/history', methods=['GET'])
 def get_paper_history():
-    """
-    Calculates and returns the daily portfolio value and stats for a given period.
-    (This is from Ricky's branch, using the JSON file, with the scalar/ambiguous bug fixed)
-    """
     portfolio = load_portfolio()
     transactions = portfolio.get("transactions", [])
-
     if not transactions:
         return jsonify({"dates": [], "values": [], "summary": {}})
-
-    # --- 1. Determine Date Range ---
-    period = request.args.get('period', 'ytd')
-    today = date.today()
-
     try:
         first_tx_date = datetime.strptime(transactions[0]["date"], '%Y-%m-%d').date()
     except (IndexError, ValueError):
-        return jsonify({"dates": [], "values": [], "summary": {}})  # No valid transactions
+        return jsonify({"dates": [], "values": [], "summary": {}})
 
+    period = request.args.get('period', 'ytd');
+    today = date.today()
     if period == '1m':
         start_date = today - timedelta(days=30)
     elif period == '3m':
@@ -851,20 +692,12 @@ def get_paper_history():
         start_date = today - timedelta(days=365)
     elif period == 'ytd':
         start_date = date(today.year, 1, 1)
-    else:  # 'all'
+    else:
         start_date = first_tx_date
-
     end_date = today
+    if start_date > end_date: start_date = end_date
+    if start_date < first_tx_date: start_date = first_tx_date
 
-    # Ensure start_date is not in the future (can happen on Jan 1st for YTD)
-    if start_date > end_date:
-        start_date = end_date
-
-    # Ensure start date is not before first transaction
-    if start_date < first_tx_date:
-        start_date = first_tx_date
-
-    # --- 2. Get All Tickers and Price Data ---
     all_tickers = list(set([t["ticker"] for t in transactions if t["type"] in ["BUY", "SELL"]]))
     if not all_tickers:
         return jsonify({"dates": [], "values": [], "summary": {}})
@@ -872,33 +705,27 @@ def get_paper_history():
     try:
         hist_data = yf.download(all_tickers, start=start_date - timedelta(days=7), end=end_date + timedelta(days=1))
         if hist_data.empty:
-            # Handle case where download is empty but tickers exist
             return jsonify({"error": "Could not fetch historical data for portfolio tickers."}), 500
 
-        # --- THIS IS THE FIX for the 'scalar' and 'ambiguous' bugs ---
         close_prices_raw = hist_data.get('Close')
         if close_prices_raw is None:
             return jsonify({"error": "Could not get 'Close' price data from yfinance."}), 500
 
-        if len(all_tickers) == 1:
-            # If only one ticker, yf.download returns a Series for 'Close'
-            # We must convert it to a DataFrame
+        if isinstance(close_prices_raw, pd.Series):
             close_prices = pd.DataFrame({all_tickers[0]: close_prices_raw})
+        elif isinstance(close_prices_raw, (float, np.float64)):
+            close_prices = pd.DataFrame({all_tickers[0]: [close_prices_raw]}, index=hist_data.index)
         else:
-            # If multiple tickers, yf.download returns a DataFrame
             close_prices = close_prices_raw
-        # --- END FIX ---
 
-        # --- 3. Calculate Portfolio State at Start Date ---
-        initial_cash = 100000.0
-        initial_positions = {}
+        initial_cash = 100000.0;
+        initial_positions = {};
         net_contributions = 0
-
         for tx in transactions:
             tx_date = datetime.strptime(tx["date"], '%Y-%m-%d').date()
             if tx_date < start_date:
-                shares = float(tx["shares"])
-                total = float(tx["total"])
+                shares = float(tx["shares"]);
+                total = float(tx["total"]);
                 ticker = tx["ticker"]
                 if tx["type"] == "BUY":
                     initial_cash -= total
@@ -909,35 +736,30 @@ def get_paper_history():
 
         start_value = initial_cash
         for ticker, shares in initial_positions.items():
-            if shares > 0 and ticker in close_prices.columns:  # Check if ticker exists
+            if shares > 0 and ticker in close_prices.columns:
                 try:
                     price = close_prices[ticker].asof(start_date)
-                    if not pd.isna(price):
-                        start_value += shares * float(price)
+                    if not pd.isna(price): start_value += shares * float(price)
                 except (KeyError, TypeError):
                     pass
 
-        # --- 4. Process Daily Values ---
         date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-        portfolio_values = []
-        current_cash = initial_cash
+        portfolio_values = [];
+        current_cash = initial_cash;
         current_positions = initial_positions.copy()
-
         tx_by_date = {}
         for tx in transactions:
             tx_date = datetime.strptime(tx["date"], '%Y-%m-%d').date()
             if start_date <= tx_date <= end_date:
-                if tx_date not in tx_by_date:
-                    tx_by_date[tx_date] = []
+                if tx_date not in tx_by_date: tx_by_date[tx_date] = []
                 tx_by_date[tx_date].append(tx)
 
         for day in date_range:
             day_str = day.strftime('%Y-%m-%d')
-
             if day.date() in tx_by_date:
                 for tx in tx_by_date[day.date()]:
-                    shares = float(tx["shares"])
-                    total = float(tx["total"])
+                    shares = float(tx["shares"]);
+                    total = float(tx["total"]);
                     ticker = tx["ticker"]
                     if tx["type"] == "BUY":
                         current_cash -= total
@@ -945,35 +767,29 @@ def get_paper_history():
                     elif tx["type"] == "SELL":
                         current_cash += total
                         current_positions[ticker] -= shares
-
             total_holdings_value = 0
             for ticker, shares in current_positions.items():
-                if shares > 0 and ticker in close_prices.columns:  # Check if ticker exists
+                if shares > 0 and ticker in close_prices.columns:
                     try:
                         price = close_prices[ticker].asof(day)
-                        if not pd.isna(price):
-                            total_holdings_value += shares * float(price)
+                        if not pd.isna(price): total_holdings_value += shares * float(price)
                     except (KeyError, TypeError):
                         pass
-
             portfolio_values.append({"date": day_str, "value": total_holdings_value + current_cash})
 
-        # --- 5. Calculate Final Summary Stats ---
         end_value = portfolio_values[-1]["value"] if portfolio_values else start_value
         wealth_generated = end_value - start_value - net_contributions
-
         if start_value == 0 or start_value is None:
             return_cumulative = 0 if wealth_generated == 0 else float('inf')
         else:
             return_cumulative = (wealth_generated / start_value) * 100
-
         num_days = (end_date - start_date).days
         if num_days <= 0:
-            return_annualized = return_cumulative  # If 0 or 1 day, just show cumulative
+            return_annualized = return_cumulative
         elif num_days < 365:
             return_annualized = return_cumulative * (365.0 / num_days)
-        else:  # > 1 year
-            return_annualized = ((1 + (return_cumulative / 100)) ** (365.0 / num_days) - 1) * 100  # CAGR
+        else:
+            return_annualized = ((1 + (return_cumulative / 100)) ** (365.0 / num_days) - 1) * 100
 
         summary = {
             "period": period, "start_date": start_date.strftime('%Y-%m-%d'),
@@ -982,41 +798,29 @@ def get_paper_history():
             "return_cumulative_pct": round(return_cumulative, 2),
             "return_annualized_pct": round(return_annualized, 2)
         }
-
         return jsonify({
             "dates": [pv["date"] for pv in portfolio_values],
             "values": [round(pv["value"], 2) for pv in portfolio_values],
             "summary": summary
         })
-
     except Exception as e:
-        # Provide more details in the error
         print(f"Error in /paper/history: {e}")
         return jsonify({"error": f"Failed to build history: {str(e)}"}), 500
 
 
-# This is Jimmy's trade history list endpoint, modified to use JSON
 @app.route('/paper/transactions', methods=['GET'])
 def get_trade_history():
     portfolio = load_portfolio()
-    return jsonify(portfolio.get("trade_history", [])[-50:])  # Return last 50 trades
+    return jsonify(portfolio.get("trade_history", [])[-50:])
 
 
-# This is Jimmy's reset endpoint, modified to use JSON
 @app.route('/paper/reset', methods=['POST'])
 def reset_portfolio():
-    # Create a new, blank portfolio
     new_portfolio = {
-        "cash": 100000.0,
-        "starting_cash": 100000.0,
-        "positions": {},
-        "options_positions": {},
-        "transactions": [],
-        "trade_history": []
+        "cash": 100000.0, "starting_cash": 100000.0, "positions": {},
+        "options_positions": {}, "transactions": [], "trade_history": []
     }
-    save_portfolio(new_portfolio)  # Save the blank portfolio
-
-    # We should also clear the SQLite history
+    save_portfolio(new_portfolio)
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -1028,19 +832,171 @@ def reset_portfolio():
         print(f"Failed to reset portfolio_history table: {e}")
     finally:
         if conn: conn.close()
+    return jsonify({"success": True, "message": "Portfolio reset to starting state",
+                    "starting_cash": new_portfolio["starting_cash"]})
 
-    return jsonify({
-        "success": True, "message": "Portfolio reset to starting state",
-        "starting_cash": new_portfolio["starting_cash"]
-    })
+
+# --- NEW: Notification Endpoints ---
+@app.route('/notifications', methods=['GET', 'POST'])
+def handle_notifications():
+    notifications = load_notifications()
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json()
+            if not data or 'ticker' not in data or 'condition' not in data or 'target_price' not in data:
+                return jsonify({"error": "Missing required fields (ticker, condition, target_price)"}), 400
+
+            # Check if ticker is valid
+            try:
+                stock = yf.Ticker(data['ticker']).info
+                if stock.get('regularMarketPrice') is None:
+                    return jsonify({"error": f"Invalid ticker: {data['ticker']}"}), 400
+            except Exception:
+                return jsonify({"error": f"Invalid ticker: {data['ticker']}"}), 400
+
+            new_alert = {
+                "id": str(uuid.uuid4()),
+                "ticker": data['ticker'].upper(),
+                "condition": data['condition'],
+                "target_price": float(data['target_price']),
+                "created_at": datetime.now().isoformat()
+            }
+            notifications['active'].append(new_alert)
+            save_notifications(notifications)
+            return jsonify(new_alert), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # GET request
+    return jsonify(notifications.get('active', []))
+
+
+@app.route('/notifications/<string:alert_id>', methods=['DELETE'])
+def delete_notification(alert_id):
+    notifications = load_notifications()
+    notifications['active'] = [a for a in notifications['active'] if a['id'] != alert_id]
+    save_notifications(notifications)
+    return jsonify({"message": "Alert deleted"}), 200
+
+
+@app.route('/notifications/triggered', methods=['GET', 'DELETE'])
+def get_triggered_notifications():
+    notifications = load_notifications()
+
+    if request.method == 'GET':
+        # Check for 'all' query param
+        if request.args.get('all') == 'true':
+            return jsonify(notifications.get('triggered', []))
+
+        # Default behavior: return only unseen
+        unseen_alerts = [a for a in notifications['triggered'] if not a.get('seen', False)]
+        # Mark them as 'seen'
+        for alert in notifications['triggered']:
+            alert['seen'] = True
+        save_notifications(notifications)
+        return jsonify(unseen_alerts)
+
+    # DELETE request
+    if request.args.get('id'):
+        alert_id = request.args.get('id')
+        notifications['triggered'] = [a for a in notifications['triggered'] if a['id'] != alert_id]
+    else:
+        # Clear all
+        notifications['triggered'] = []
+    save_notifications(notifications)
+    return jsonify({"message": "Triggered alerts cleared"}), 200
+
+
+@app.route('/notifications/triggered/<string:alert_id>', methods=['DELETE'])
+def delete_triggered_notification(alert_id):
+    notifications = load_notifications()
+    notifications['triggered'] = [a for a in notifications['triggered'] if a['id'] != alert_id]
+    save_notifications(notifications)
+    return jsonify({"message": "Alert dismissed"}), 200
+
+
+# --- END NEW NOTIFICATION ENDPOINTS ---
+
+
+# --- NEW: Background Price Checker ---
+def check_alerts():
+    print(f"[{datetime.now()}] Running price alert check...")
+    notifications_data = load_notifications()
+    if not notifications_data['active']:
+        return  # No active alerts, do nothing
+
+    active_alerts_copy = notifications_data['active'].copy()
+    tickers_to_check = list(set([a['ticker'] for a in active_alerts_copy]))
+
+    try:
+        data = yf.download(tickers_to_check, period="1d")
+        if data.empty:
+            print("Price check: yfinance returned no data.")
+            return
+
+        current_prices = data['Close'].iloc[-1]
+
+        triggered_ids = []
+        for alert in active_alerts_copy:
+            try:
+                if len(tickers_to_check) == 1:
+                    current_price = float(current_prices)
+                else:
+                    current_price = float(current_prices.get(alert['ticker'], 0))
+
+                if current_price == 0:
+                    continue  # Skip if price is 0
+
+                target_price = alert['target_price']
+                condition_met = False
+
+                if alert['condition'] == 'below' and current_price < target_price:
+                    condition_met = True
+                    message = f"{alert['ticker']} is now ${current_price:.2f} (below your target of ${target_price:.2f})"
+                elif alert['condition'] == 'above' and current_price > target_price:
+                    condition_met = True
+                    message = f"{alert['ticker']} is now ${current_price:.2f} (above your target of ${target_price:.2f})"
+
+                if condition_met:
+                    print(f"Triggering alert for {alert['ticker']}")
+                    triggered_alert = {
+                        "id": str(uuid.uuid4()),
+                        "message": message,
+                        "seen": False,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    notifications_data['triggered'].append(triggered_alert)
+                    triggered_ids.append(alert['id'])
+
+            except Exception as e:
+                print(f"Error checking alert for {alert['ticker']}: {e}")
+
+        # Remove triggered alerts from active list
+        if triggered_ids:
+            notifications_data['active'] = [a for a in notifications_data['active'] if a['id'] not in triggered_ids]
+            save_notifications(notifications_data)
+            print(f"Triggered and moved {len(triggered_ids)} alerts.")
+
+    except Exception as e:
+        print(f"Failed to check all alert prices: {e}")
+
+
+def run_scheduler():
+    schedule.every(1).minutes.do(check_alerts)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+
+# --- END BACKGROUND CHECKER ---
 
 
 # --- All of Tazeem's other endpoints (Forex, Crypto, etc.) ---
-
 @app.route('/api/news', methods=['GET'])
 def news_api():
     try:
-        articles = get_general_news()
+        articles = get_general_news();
         return jsonify(articles)
     except Exception as e:
         return jsonify({"error": f"Failed to fetch news: {str(e)}"}), 500
@@ -1053,8 +1009,7 @@ def evaluate_models(ticker):
         test_days = int(request.args.get('test_days', 60))
         retrain_frequency = int(request.args.get('retrain_frequency', 5))
         result = rolling_window_backtest(sanitized_ticker, test_days=test_days, retrain_frequency=retrain_frequency)
-        if result is None:
-            return jsonify({"error": "Insufficient data for evaluation"}), 404
+        if result is None: return jsonify({"error": "Insufficient data for evaluation"}), 404
         return jsonify(result)
     except Exception as e:
         print(f"Evaluation error for {ticker}: {e}")
@@ -1064,11 +1019,10 @@ def evaluate_models(ticker):
 @app.route('/forex/convert')
 def forex_convert():
     try:
-        from_currency = request.args.get('from', 'USD').upper()
+        from_currency = request.args.get('from', 'USD').upper();
         to_currency = request.args.get('to', 'EUR').upper()
         rate_data = get_exchange_rate(from_currency, to_currency)
-        if rate_data is None:
-            return jsonify({"error": "Could not fetch exchange rate"}), 404
+        if rate_data is None: return jsonify({"error": "Could not fetch exchange rate"}), 404
         return jsonify(rate_data)
     except Exception as e:
         print(f"Forex convert error: {e}")
@@ -1078,7 +1032,7 @@ def forex_convert():
 @app.route('/forex/currencies')
 def forex_currencies():
     try:
-        currencies = get_currency_list()
+        currencies = get_currency_list();
         return jsonify(currencies)
     except Exception as e:
         print(f"Forex currencies error: {e}")
@@ -1088,11 +1042,10 @@ def forex_currencies():
 @app.route('/crypto/convert')
 def crypto_convert():
     try:
-        from_crypto = request.args.get('from', 'BTC').upper()
+        from_crypto = request.args.get('from', 'BTC').upper();
         to_currency = request.args.get('to', 'USD').upper()
         rate_data = get_crypto_exchange_rate(from_crypto, to_currency)
-        if rate_data is None:
-            return jsonify({"error": "Could not fetch crypto exchange rate"}), 404
+        if rate_data is None: return jsonify({"error": "Could not fetch crypto exchange rate"}), 404
         return jsonify(rate_data)
     except Exception as e:
         print(f"Crypto convert error: {e}")
@@ -1102,7 +1055,7 @@ def crypto_convert():
 @app.route('/crypto/list')
 def crypto_list():
     try:
-        cryptos = get_crypto_list()
+        cryptos = get_crypto_list();
         return jsonify(cryptos)
     except Exception as e:
         print(f"Crypto list error: {e}")
@@ -1112,7 +1065,7 @@ def crypto_list():
 @app.route('/crypto/currencies')
 def crypto_target_currencies():
     try:
-        currencies = get_target_currencies()
+        currencies = get_target_currencies();
         return jsonify(currencies)
     except Exception as e:
         print(f"Crypto currencies error: {e}")
@@ -1124,8 +1077,7 @@ def commodity_price(commodity):
     try:
         period = request.args.get('period', '5d')
         data = get_commodity_price(commodity, period)
-        if data is None:
-            return jsonify({"error": "Could not fetch commodity price"}), 404
+        if data is None: return jsonify({"error": "Could not fetch commodity price"}), 404
         return jsonify(data)
     except Exception as e:
         print(f"Commodity price error: {e}")
@@ -1135,7 +1087,7 @@ def commodity_price(commodity):
 @app.route('/commodities/list')
 def commodities_list():
     try:
-        commodities = get_commodity_list()
+        commodities = get_commodity_list();
         return jsonify(commodities)
     except Exception as e:
         print(f"Commodities list error: {e}")
@@ -1145,7 +1097,7 @@ def commodities_list():
 @app.route('/commodities/all')
 def commodities_all():
     try:
-        commodities = get_commodities_by_category()
+        commodities = get_commodities_by_category();
         return jsonify(commodities)
     except Exception as e:
         print(f"Commodities all error: {e}")
@@ -1163,8 +1115,6 @@ def get_fundamentals(ticker):
         data = response.json()
         if not data or 'Symbol' not in data:
             return jsonify({"error": f"No fundamental data found for {ticker}"}), 404
-
-        # We can just return the raw data, the frontend can format it
         return jsonify(data)
     except Exception as e:
         print(f"Fundamentals error for {ticker}: {e}")
@@ -1174,8 +1124,7 @@ def get_fundamentals(ticker):
 @app.route('/search-symbols')
 def search_symbols():
     query = request.args.get('q')
-    if not query:
-        return jsonify([])
+    if not query: return jsonify([])
     try:
         formatted_matches = get_symbol_suggestions(query)
         return jsonify(formatted_matches)
@@ -1186,5 +1135,11 @@ def search_symbols():
 
 # --- Main execution ---
 if __name__ == '__main__':
-    init_db()  # We keep this to initialize the portfolio history table
-    app.run(debug=True, port=5001)
+    init_db()  # Initialize the SQLite history table
+
+    # --- NEW: Start the background thread ---
+    print("Starting background alert checker...")
+    checker_thread = threading.Thread(target=run_scheduler, daemon=True)
+    checker_thread.start()
+
+    app.run(debug=True, port=5001, use_reloader=False)  # use_reloader=False is important for threads
