@@ -1,0 +1,16 @@
+node_modules/
+.cache/
+frontend/node_modules/
+frontend/.cache/
+/backend/__pycache__/
+backend/.coverage
+/backend/__pycache__
+backend/__pycache__/
+backend/marketmind.db
+.idea/
+/backend/__pycache__
+backend/venv/
+.env
+/backend/venv
+.env
+/backend/venv
