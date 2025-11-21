@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Star, Briefcase, Building2, TrendingUp, Target, Globe, DollarSign, Bitcoin, BarChart3, Newspaper, HelpCircle, Bell, Sun, Moon, ChevronDown } from 'lucide-react';
+import {
+    Search, Star, Briefcase, Building2, TrendingUp, Target, Globe, DollarSign,
+    Bitcoin, BarChart3, Newspaper, HelpCircle, Sun, Moon, ChevronDown, Bell
+} from 'lucide-react';
 import { useDarkMode } from '../context/DarkModeContext';
 
 const Header = ({ activePage, setActivePage }) => {
     const { isDarkMode, toggleDarkMode } = useDarkMode();
     const [showOtherMenu, setShowOtherMenu] = useState(false);
-    
     // --- NEW: State for notifications ---
     const [newAlertCount, setNewAlertCount] = useState(0);
 
@@ -86,9 +88,9 @@ const Header = ({ activePage, setActivePage }) => {
                             <Building2 className="w-4 h-4 inline mr-1" />
                             Fundamentals
                         </NavButton>
-                        
+
                         <NavDivider />
-                        
+
                         {/* Stock Analysis */}
                         <NavButton pageName="predictions">
                             <TrendingUp className="w-4 h-4 inline mr-1" />
@@ -98,9 +100,13 @@ const Header = ({ activePage, setActivePage }) => {
                             <Target className="w-4 h-4 inline mr-1" />
                             Evaluate
                         </NavButton>
-                        
+                        <NavButton pageName="options">
+                            <BarChart3 className="w-4 h-4 inline mr-1" />
+                            Options
+                        </NavButton>
+
                         <NavDivider />
-                        
+
                         {/* Other Markets Dropdown */}
                         <div className="relative">
                             <button
@@ -115,53 +121,39 @@ const Header = ({ activePage, setActivePage }) => {
                                 <span>Other</span>
                                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showOtherMenu ? 'rotate-180' : ''}`} />
                             </button>
-                            
+
                             {/* Dropdown Menu with Slide Animation */}
-                            <div 
+                            <div
                                 className={`absolute top-full left-0 mt-2 bg-gray-900 dark:bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden transition-all duration-300 ease-out z-50 ${
                                     showOtherMenu 
                                         ? 'opacity-100 translate-y-0 max-h-48' 
                                         : 'opacity-0 -translate-y-2 max-h-0 pointer-events-none'
                                 }`}
                                 style={{ minWidth: '180px' }}
+                                onMouseLeave={() => setShowOtherMenu(false)} // Close on mouse leave
                             >
                                 <button
-                                    onClick={() => {
-                                        setActivePage('forex');
-                                        setShowOtherMenu(false);
-                                    }}
+                                    onClick={() => { handleNavClick('forex'); setShowOtherMenu(false); }}
                                     className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center space-x-2 ${
-                                        activePage === 'forex'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                        activePage === 'forex' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                     }`}
                                 >
                                     <DollarSign className="w-4 h-4" />
                                     <span>Forex</span>
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        setActivePage('crypto');
-                                        setShowOtherMenu(false);
-                                    }}
+                                    onClick={() => { handleNavClick('crypto'); setShowOtherMenu(false); }}
                                     className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center space-x-2 ${
-                                        activePage === 'crypto'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                        activePage === 'crypto' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                     }`}
                                 >
                                     <Bitcoin className="w-4 h-4" />
                                     <span>Crypto</span>
                                 </button>
                                 <button
-                                    onClick={() => {
-                                        setActivePage('commodities');
-                                        setShowOtherMenu(false);
-                                    }}
+                                    onClick={() => { handleNavClick('commodities'); setShowOtherMenu(false); }}
                                     className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center space-x-2 ${
-                                        activePage === 'commodities'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                        activePage === 'commodities' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                                     }`}
                                 >
                                     <BarChart3 className="w-4 h-4" />
@@ -169,9 +161,9 @@ const Header = ({ activePage, setActivePage }) => {
                                 </button>
                             </div>
                         </div>
-                        
+
                         <NavDivider />
-                        
+
                         {/* Information */}
                         <NavButton pageName="news">
                             <Newspaper className="w-4 h-4 inline mr-1" />

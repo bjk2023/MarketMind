@@ -1,0 +1,19 @@
+{
+    "active": [
+        {
+            "id": "6f8478df-38b7-4f1d-b05b-807bc51d86b6",
+            "ticker": "AAPL",
+            "condition": "above",
+            "target_price": 267.5,
+            "created_at": "2025-11-18T00:31:31.456220"
+        }
+    ],
+    "triggered": [
+        {
+            "id": "74a602a5-7f7d-4cfd-a1f1-c4365c719deb",
+            "message": "AAPL is now $267.46 (below your target of $267.46)",
+            "seen": true,
+            "timestamp": "2025-11-18T00:30:57.877664"
+        }
+    ]
+}

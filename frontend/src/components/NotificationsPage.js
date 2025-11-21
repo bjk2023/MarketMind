@@ -49,6 +49,12 @@ const NotificationsPage = ({ onClearAlerts }) => {
 
             setActiveAlerts(activeData);
             setTriggeredAlerts(triggeredData);
+
+            // Clear the header bell count
+            if (onClearAlerts) {
+                onClearAlerts();
+            }
+
         } catch (err) {
             setError(err.message);
         } finally {
@@ -56,231 +62,179 @@ const NotificationsPage = ({ onClearAlerts }) => {
         }
     };
 
+    // Load all data when the page opens
     useEffect(() => {
         fetchAllAlerts();
-        // Optional: poll every 30 seconds to refresh triggered alerts
-        const interval = setInterval(() => {
-            // Only refresh triggered alerts (less frequent)
-            fetch('http://127.0.0.1:5001/notifications/triggered?all=true')
-                .then(res => res.json())
-                .then(data => setTriggeredAlerts(data))
-                .catch(() => {}); // Silent fail
-        }, 30000);
-        return () => clearInterval(interval);
     }, []);
 
-    const handleSubmit = async (e) => {
+    const handleCreateNotification = async (e) => {
         e.preventDefault();
-        if (!ticker || !price) {
-            setMessage({ type: 'error', text: 'Please fill in all fields.' });
-            return;
-        }
-
+        setMessage(null);
         try {
-            const res = await fetch('http://127.0.0.1:5001/notifications', {
+            const response = await fetch('http://127.0.0.1:5001/notifications', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     ticker: ticker.toUpperCase(),
-                    condition,
+                    condition: condition,
                     target_price: parseFloat(price)
                 })
             });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to create notification.');
 
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || 'Failed to create alert.');
-            }
-
-            const newAlert = await res.json();
-            setActiveAlerts(prev => [...prev, newAlert]);
-            setMessage({ type: 'success', text: 'Alert created successfully!' });
+            setMessage({ type: 'success', text: 'Notification created successfully!' });
             setTicker('');
             setPrice('');
-            setTimeout(() => setMessage(null), 3000);
+            fetchAllAlerts(); // Refresh both lists
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
-            setTimeout(() => setMessage(null), 5000);
         }
     };
 
-    const handleDeleteActive = async (alertId) => {
-        try {
-            const res = await fetch(`http://127.0.0.1:5001/notifications/${alertId}`, {
-                method: 'DELETE'
-            });
-            if (!res.ok) throw new Error('Failed to delete alert.');
-            setActiveAlerts(prev => prev.filter(a => a.id !== alertId));
-        } catch (err) {
-            setError(err.message);
-        }
-    };
+    const handleDelete = async (id, type) => {
+        const endpoint = type === 'active'
+            ? `http://127.0.0.1:5001/notifications/${id}`
+            : `http://127.0.0.1:5001/notifications/triggered/${id}`;
 
-    const handleDeleteTriggered = async (alertId) => {
         try {
-            const res = await fetch(`http://127.0.0.1:5001/notifications/triggered/${alertId}`, {
-                method: 'DELETE'
-            });
-            if (!res.ok) throw new Error('Failed to dismiss alert.');
-            setTriggeredAlerts(prev => prev.filter(a => a.id !== alertId));
-        } catch (err) {
-            setError(err.message);
-        }
-    };
+            const response = await fetch(endpoint, { method: 'DELETE' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to delete.');
 
-    const handleClearAllTriggered = async () => {
-        try {
-            const res = await fetch('http://127.0.0.1:5001/notifications/triggered', {
-                method: 'DELETE'
-            });
-            if (!res.ok) throw new Error('Failed to clear alerts.');
-            setTriggeredAlerts([]);
-            if (onClearAlerts) onClearAlerts(); // Notify parent to clear badge
+            setMessage({ type: 'success', text: data.message });
+            fetchAllAlerts(); // Refresh both lists
         } catch (err) {
-            setError(err.message);
+            setMessage({ type: 'error', text: err.message });
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
-            <div className="max-w-4xl mx-auto">
-                <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-8 flex items-center">
-                    <BellRing className="mr-2 text-blue-600" />
+        <div className="container mx-auto px-6 py-8 max-w-4xl animate-fade-in">
+            <div className="flex items-center justify-center mb-6">
+                <Bell className="w-10 h-10 text-blue-600 dark:text-blue-400 mr-3" />
+                <h1 className="text-4xl font-bold text-gray-900 dark:text-white">
                     Price Alerts
                 </h1>
+            </div>
 
-                {/* Create Alert Form */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-                    <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center">
-                        <Plus className="mr-2" />
-                        Create New Alert
-                    </h2>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Stock Ticker
-                                </label>
-                                <input
-                                    type="text"
-                                    value={ticker}
-                                    onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                                    placeholder="e.g., AAPL"
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                    maxLength={5}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Condition
-                                </label>
-                                <select
-                                    value={condition}
-                                    onChange={(e) => setCondition(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                >
-                                    <option value="above">Above</option>
-                                    <option value="below">Below</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Target Price ($)
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={price}
-                                    onChange={(e) => setPrice(e.target.value)}
-                                    placeholder="e.g., 150.00"
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                                />
-                            </div>
+            {/* --- Create Notification Form --- */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Create New Alert</h2>
+                <form onSubmit={handleCreateNotification}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stock Ticker</label>
+                            <input
+                                type="text"
+                                value={ticker}
+                                onChange={(e) => setTicker(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="AAPL"
+                                required
+                            />
                         </div>
-                        <button
-                            type="submit"
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-                        >
-                            <Plus className="mr-2" size={18} />
-                            Create Alert
-                        </button>
-                    </form>
-                    <FormNotification message={message} onDismiss={() => setMessage(null)} />
-                </div>
-
-                {/* Triggered Alerts */}
-                {triggeredAlerts.length > 0 && (
-                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg shadow-md p-6 mb-8">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-semibold text-red-700 dark:text-red-400 flex items-center">
-                                <BellRing className="mr-2" />
-                                Triggered Alerts ({triggeredAlerts.length})
-                            </h2>
-                            <button
-                                onClick={handleClearAllTriggered}
-                                className="text-sm bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors"
+                        <div className="md:col-span-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Alert me when price is...</label>
+                            <select
+                                value={condition}
+                                onChange={(e) => setCondition(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                required
                             >
-                                Clear All
-                            </button>
+                                <option value="below">Below</option>
+                                <option value="above">Above</option>
+                            </select>
                         </div>
-                        <div className="space-y-3">
-                            {triggeredAlerts.map(alert => (
-                                <div key={alert.id} className="bg-white dark:bg-gray-800 p-3 rounded border-l-4 border-red-500 flex justify-between items-center">
-                                    <div>
-                                        <p className="font-medium text-gray-800 dark:text-gray-200">{alert.message}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {new Date(alert.timestamp).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => handleDeleteTriggered(alert.id)}
-                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            ))}
+                        <div className="md:col-span-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target Price</label>
+                            <input
+                                type="number"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="170.00"
+                                min="0.01"
+                                step="0.01"
+                                required
+                            />
                         </div>
                     </div>
-                )}
+                    <button
+                        type="submit"
+                        className="mt-6 w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all active:scale-95 flex items-center justify-center space-x-2"
+                    >
+                        <Plus className="w-5 h-5" />
+                        <span>Create Notification</span>
+                    </button>
+                    <FormNotification message={message} onDismiss={() => setMessage(null)} />
+                </form>
+            </div>
 
-                {/* Active Alerts */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                    <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                        Active Alerts ({activeAlerts.length})
-                    </h2>
-                    {loading ? (
-                        <p className="text-gray-500 dark:text-gray-400">Loading alerts...</p>
-                    ) : error ? (
-                        <p className="text-red-500">Error: {error}</p>
-                    ) : activeAlerts.length === 0 ? (
-                        <p className="text-gray-500 dark:text-gray-400">No active alerts.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {activeAlerts.map(alert => (
-                                <div key={alert.id} className="border border-gray-200 dark:border-gray-600 p-3 rounded flex justify-between items-center">
-                                    <div>
-                                        <span className="font-medium text-gray-800 dark:text-gray-200">
-                                            {alert.ticker}
-                                        </span>
-                                        <span className="mx-2 text-gray-500 dark:text-gray-400">
-                                            {alert.condition === 'above' ? '↑' : '↓'} ${alert.target_price}
-                                        </span>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Created {new Date(alert.created_at).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => handleDeleteActive(alert.id)}
-                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+            {/* --- Triggered Alerts List --- */}
+            {triggeredAlerts.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border border-blue-200 dark:border-blue-700">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">New Alerts That Fired</h2>
+                    <div className="space-y-3">
+                        {triggeredAlerts.map((alert) => (
+                            <div key={alert.id} className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                                <div className="flex items-center">
+                                    <BellRing className="w-5 h-5 text-blue-500 mr-3" />
+                                    <span className="text-gray-700 dark:text-gray-200">{alert.message}</span>
                                 </div>
-                            ))}
-                        </div>
-                    )}
+                                <button
+                                    onClick={() => handleDelete(alert.id, 'triggered')}
+                                    className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 p-2 rounded-lg transition-all"
+                                    title="Dismiss Alert"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
+            )}
+
+            {/* --- Active Alerts List --- */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Your Active Alerts</h2>
+                {loading && <p className="text-gray-600 dark:text-gray-400">Loading alerts...</p>}
+                {error && !loading && <p className="text-red-600 dark:text-red-400">{error}</p>}
+                {!loading && activeAlerts.length === 0 && (
+                    <p className="text-gray-600 dark:text-gray-400">You have no active price alerts.</p>
+                )}
+                {activeAlerts.length > 0 && (
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead className="border-b-2 border-gray-200 dark:border-gray-700">
+                                <tr>
+                                    <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300 font-semibold">Stock</th>
+                                    <th className="text-left py-3 px-4 text-gray-700 dark:text-gray-300 font-semibold">Condition</th>
+                                    <th className="text-right py-3 px-4 text-gray-700 dark:text-gray-300 font-semibold">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {activeAlerts.map((alert) => (
+                                    <tr key={alert.id} className="border-b border-gray-200 dark:border-gray-700">
+                                        <td className="py-3 px-4 font-semibold text-gray-900 dark:text-white">{alert.ticker}</td>
+                                        <td className="py-3 px-4 text-gray-600 dark:text-gray-400">
+                                            {alert.condition === 'below' ? 'Below' : 'Above'} ${alert.target_price.toFixed(2)}
+                                        </td>
+                                        <td className="py-3 px-4 text-right">
+                                            <button
+                                                onClick={() => handleDelete(alert.id, 'active')}
+                                                className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-all"
+                                                title="Delete Alert"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         </div>
     );
