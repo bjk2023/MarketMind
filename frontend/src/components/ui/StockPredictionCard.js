@@ -36,7 +36,9 @@ const StockPredictionCard = ({ data }) => {
                     />
                 ))}
             </div>
-
+            <div className="mt-4 text-sm text-gray-400 text-right">
+                Model: {data.model}
+            </div>
         </div>
     );
 };

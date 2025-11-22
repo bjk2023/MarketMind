@@ -4,7 +4,7 @@ import os
 import yfinance as yf
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from model import create_dataset, estimate_this_week, try_today, estimate_new, good_model, estimate_model_new
+from model import create_dataset, estimate_this_week, find_best_model
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -105,6 +105,7 @@ def predict_stock(ticker):
             "recentDate": last_valid_index.strftime('%Y-%m-%d'),
             "recentClose": round(current_df.loc[last_valid_index]["Close"].item(), 2),
             "recentPredicted": round(current_df["Predicted"].iloc[0], 2),
+            "model": "Random Forest" if find_best_model(df) == "rf" else "AutoRegressive",
             "predictions": [
                 {"date": date.strftime('%Y-%m-%d'), "predictedClose": round(pred, 2)}
                 for date, pred in zip(prediction_df.index, prediction_df["Predicted"])

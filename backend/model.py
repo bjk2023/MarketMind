@@ -27,7 +27,10 @@ def try_today(df):
 
 def estimate_this_week(df):
     last_valid_index = df['Close'].last_valid_index()
-    new_df = estimate_rf_new(df, last_valid_index - pd.Timedelta(days=1), numdays=7)
+    if find_best_model(df) == "rf":
+        new_df = estimate_rf_new(df, last_valid_index - pd.Timedelta(days=1), numdays=7)
+    else:
+        new_df = estimate_ar_new(df, last_valid_index - pd.Timedelta(days=1), numdays=7)
     last_valid_index = new_df['Close'].last_valid_index()
 
     return new_df.loc[last_valid_index:]
@@ -90,6 +93,21 @@ def estimate_rf_new(df, startdays, numdays=1):
         df_subset = df.loc[df.index <= next_date]
         startdays = startdays + pd.Timedelta(days=1)
     return df
+
+def find_best_model(df):
+    df = df.copy()
+    today = pd.Timestamp.today().normalize()
+    rf_df = estimate_rf_new(df, today - pd.Timedelta(days=1)).loc[today]
+    ar_df = estimate_ar_new(df, today - pd.Timedelta(days=1)).loc[today]
+
+    rf_difference = abs(rf_df['Close'].values[0] - rf_df['Predicted'].values[0])
+    ar_difference = abs(ar_df['Close'].values[0] - ar_df['Predicted'].values[0])
+
+    if rf_difference < ar_difference:
+        return "rf"
+    else:
+        return "ar"
+
 
 #Evaluating the model using Mean Absolute Error (MAE)
 def good_model(df_predicted):

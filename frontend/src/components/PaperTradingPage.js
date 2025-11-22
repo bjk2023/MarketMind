@@ -15,6 +15,10 @@ function PaperTradingPage() {
   };
 
   const handleTrade = (type) => {
+    if (!ticker || !shares || isNaN(Number(shares))) {
+      alert("Enter a valid ticker and number of shares");
+      return;
+    }
     const endpoint = type === 'buy' ? '/paper/buy' : '/paper/sell';
     fetch(`http://127.0.0.1:5001${endpoint}`, {
       method: 'POST',
