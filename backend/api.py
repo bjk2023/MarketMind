@@ -30,6 +30,14 @@ from professional_evaluation import rolling_window_backtest
 from forex_fetcher import get_exchange_rate, get_currency_list
 from crypto_fetcher import get_crypto_exchange_rate, get_crypto_list, get_target_currencies
 from commodities_fetcher import get_commodity_price, get_commodity_list, get_commodities_by_category
+from logger_config import setup_logger
+
+#Emoji Fix
+import sys
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # --- New Imports for Options Suggester ---
 from options_suggester import generate_suggestion
@@ -38,12 +46,38 @@ from options_suggester import generate_suggestion
 from sklearn.linear_model import LinearRegression
 
 # Initialize logger
-logger = setup_logger('marketmind_api')
+import logging
+
+logger = logging.getLogger("marketmind_api")
+logger.setLevel(logging.INFO)
+
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+handler.setStream(sys.stdout)
+logger.addHandler(handler)
+
 logger.info("🚀 MarketMind API Starting...")
 
 # Initialize the Flask application
 app = Flask(__name__)
 CORS(app)
+
+# --- Rate Limiting Setup ---
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],
+    app=app
+)
+
+# Define rate limits
+class RateLimits:
+    LIGHT = "10/minute"
+    STANDARD = "20/minute"
+    HEAVY = "2/minute" 
+    WRITE = "5/minute"
 
 # --- CONFIGURATION ---
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
@@ -76,6 +110,40 @@ def init_db():
     finally:
         if conn:
             conn.close()
+
+from functools import wraps
+from flask import request, jsonify
+
+def validate_request_json(required_fields):
+    """
+    Decorator to ensure that the incoming JSON request contains
+    all required fields. Returns 400 with missing fields if not.
+    
+    Usage:
+        @app.route('/buy', methods=['POST'])
+        @validate_request_json(['ticker', 'shares'])
+        def buy_stock():
+            data = request.get_json()
+            ...
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            # Ensure request is JSON
+            if not request.is_json:
+                return jsonify({"error": "Request must be JSON"}), 400
+            
+            data = request.get_json()
+            # Check for missing fields
+            missing = [field for field in required_fields if field not in data]
+            if missing:
+                return jsonify({"error": f"Missing required fields: {missing}"}), 400
+            
+            # Everything is fine, call the route function
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
 
 
 # --- Persistent Storage Setup ---

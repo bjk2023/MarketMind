@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useCallback } from 'react';
 import { BarChart3, RefreshCw } from 'lucide-react';
 
 const CommoditiesPage = () => {
@@ -7,9 +8,13 @@ const CommoditiesPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    useEffect(() => {
+    const fetchCommoditiesMemo = useCallback(() => {
         fetchCommodities();
-    }, []);
+    }, [fetchCommodities]);
+
+    useEffect(() => {
+        fetchCommoditiesMemo();
+    }, [fetchCommoditiesMemo]);
 
     const fetchCommodities = async () => {
         setLoading(true);

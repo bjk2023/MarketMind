@@ -1,16 +1,29 @@
+# Node.js dependencies
 node_modules/
-.cache/
 frontend/node_modules/
+
+# Caches
+.cache/
 frontend/.cache/
-/backend/__pycache__/
-backend/.coverage
-/backend/__pycache__
+
+# Python bytecode
 backend/__pycache__/
+__pycache__/
+
+# Coverage files
+backend/.coverage
+
+# Database
 backend/marketmind.db
+
+# IDE files
 .idea/
-/backend/__pycache__
+
+# Python virtual environments
 backend/venv/
+
+# Environment files
 .env
-/backend/venv
-.env
-/backend/venv
+
+# Backend instance folder
+backend/instance/

@@ -200,8 +200,8 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         fetchSuggestions();
     }, [debouncedQuery, recentSearches]); // <-- Linter warning fixed
 
-    const saveRecentSearch = (searchTicker) => {
-        const updated = [searchTicker.toUpperCase(), ...recentSearches.filter(t => t !== searchTicker.toUpperCase())].slice(0, 8);
+    const saveRecentSearch = (ticker) => {
+        const updated = [ticker.toUpperCase(), ...recentSearches.filter(t => t !== ticker.toUpperCase())].slice(0, 8);
         setRecentSearches(updated);
         localStorage.setItem('recentSearches', JSON.stringify(updated));
     };
@@ -273,20 +273,20 @@ const SearchPage = ({ onNavigateToPredictions }) => {
         setActiveTimeFrame(defaultTimeFrame);
 
         try {
-            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${searchTicker}`);
+            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
                 throw new Error(errorData.error || 'Stock data not found');
             }
             const stockJson = await stockResponse.json();
             setStockData(stockJson);
-            setSearchedTicker(searchTicker);
-            saveRecentSearch(searchTicker);
+            setSearchedTicker(ticker);
+            saveRecentSearch(ticker);
 
-            await fetchChartData(searchTicker, defaultTimeFrame);
+            await fetchChartData(ticker, defaultTimeFrame);
             
             try {
-                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${searchTicker}`);
+                const predResponse = await fetch(`http://127.0.0.1:5001/predict/${ticker}`);
                 if (predResponse.ok) {
                     const predJson = await predResponse.json();
                     setPredictionData(predJson);
@@ -324,7 +324,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
 
     const handleRecentSearchClick = (recentTicker) => {
         setTicker(recentTicker);
-        executeSearch(recentTicker);
+        handleSearch({ preventDefault: () => {} });
     };
 
     const handleTimeFrameChange = (timeFrame) => {
@@ -364,7 +364,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                 <p className="text-lg text-gray-500 dark:text-gray-400 mt-3">Enter a stock symbol to get the latest data.</p>
                 <form onSubmit={handleSearch} className="mt-8 relative">
                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-                        <Search className="w-6 h-6 text-gray-400" />
+                        <SearchIcon className="w-6 h-6 text-gray-400" />
                     </div>
                     <input
                         type="text"
@@ -452,7 +452,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                                         Top Gainers
                                     </h4>
                                     <div className="space-y-2">
-                                        {suggestions.trending.gainers.slice(0, 3).map((stock) => (
+                                        {(suggestions?.trending?.gainers || []).slice(0, 3).map((stock) => (
                                             <button
                                                 key={stock.ticker}
                                                 onClick={() => handleSuggestionClick(stock.ticker)}
@@ -479,7 +479,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                                         Top Losers
                                     </h4>
                                     <div className="space-y-2">
-                                        {suggestions.trending.losers.slice(0, 3).map((stock) => (
+                                        {(suggestions?.trending?.losers || []).slice(0, 3).map((stock) => (
                                             <button
                                                 key={stock.ticker}
                                                 onClick={() => handleSuggestionClick(stock.ticker)}
@@ -506,7 +506,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                                         Most Active
                                     </h4>
                                     <div className="space-y-2">
-                                        {suggestions.trending.most_active.slice(0, 3).map((stock) => (
+                                        {(suggestions?.trending?.most_active || []).slice(0, 3).map((stock) => (
                                             <button
                                                 key={stock.ticker}
                                                 onClick={() => handleSuggestionClick(stock.ticker)}
@@ -534,7 +534,7 @@ const SearchPage = ({ onNavigateToPredictions }) => {
                                     Browse by Sector
                                 </h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                    {Object.entries(suggestions.sectors).map(([sector, sectorData]) => (
+                                    {Object.entries(suggestions?.sectors || {}).map(([sector, sectorData]) => (
                                         <div key={sector} className="bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
                                             <button
                                                 onClick={() => toggleSector(sector)}
