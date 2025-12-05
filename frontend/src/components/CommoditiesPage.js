@@ -8,14 +8,6 @@ const CommoditiesPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const fetchCommoditiesMemo = useCallback(() => {
-        fetchCommodities();
-    }, [fetchCommodities]);
-
-    useEffect(() => {
-        fetchCommoditiesMemo();
-    }, [fetchCommoditiesMemo]);
-
     const fetchCommodities = async () => {
         setLoading(true);
         setError('');
@@ -36,6 +28,10 @@ const CommoditiesPage = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        fetchCommodities();
+    }, []);
 
     const loadCommodityPrice = async (code) => {
         try {
