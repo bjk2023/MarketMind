@@ -342,8 +342,30 @@ const SearchPageComponent = forwardRef((_, ref) => {
     const [loading, setLoading] = useState(false);
     const [chartLoading, setChartLoading] = useState(false);
     const [newsLoading, setNewsLoading] = useState(false); 
+    const [searchHistory, setSearchHistory] = useState(() => {
+        // Load search history from localStorage on mount
+        const saved = localStorage.getItem('searchHistory');
+        return saved ? JSON.parse(saved) : [];
+    });
 
     const [error, setError] = useState('');
+
+    // Add ticker to search history
+    const addToSearchHistory = (tickerSymbol) => {
+        setSearchHistory(prevHistory => {
+            // Remove if already exists, then add to beginning
+            const filtered = prevHistory.filter(t => t !== tickerSymbol.toUpperCase());
+            const newHistory = [tickerSymbol.toUpperCase(), ...filtered].slice(0, 5); // Keep only last 5
+            localStorage.setItem('searchHistory', JSON.stringify(newHistory));
+            return newHistory;
+        });
+    };
+
+    // Clear search history
+    const clearSearchHistory = () => {
+        setSearchHistory([]);
+        localStorage.removeItem('searchHistory');
+    };
 
     // Expose performSearch method to parent
     useImperativeHandle(ref, () => ({
@@ -412,6 +434,7 @@ const SearchPageComponent = forwardRef((_, ref) => {
             const stockJson = await stockResponse.json();
             setStockData(stockJson); 
             setSearchedTicker(searchTicker);
+            addToSearchHistory(searchTicker); // Add to search history
 
             // Now fetch chart and news in parallel
             await Promise.all([
@@ -478,6 +501,35 @@ const SearchPageComponent = forwardRef((_, ref) => {
                         {loading ? '...' : 'Search'}
                     </button> 
                 </form>
+
+                {/* Search History */}
+                {searchHistory.length > 0 && (
+                    <div className="mt-6 text-left">
+                        <h3 className="text-sm font-semibold text-gray-600 mb-3">Search History</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {searchHistory.map((ticker) => (
+                                <button
+                                    key={ticker}
+                                    onClick={() => {
+                                        setTicker(ticker);
+                                        setTimeout(() => {
+                                            handleSearch({ preventDefault: () => {} }, ticker);
+                                        }, 0);
+                                    }}
+                                    className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm rounded-full transition-colors"
+                                >
+                                    {ticker}
+                                </button>
+                            ))}
+                            <button
+                                onClick={clearSearchHistory}
+                                className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm rounded-full transition-colors"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
             
             {/* --- UPDATED: Main content area --- */}
