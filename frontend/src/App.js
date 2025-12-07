@@ -4,6 +4,7 @@ import SearchPage from './components/SearchPage';
 import GettingStartedPage from './components/GettingStartedPage';
 import WatchlistPage from './components/WatchlistPage';
 import PaperTradingPage from './components/PaperTradingPage';
+import ComparisonPage from './components/ComparisonPage';
 
 function App() {
     const [activePage, setActivePage] = useState('search');
@@ -33,6 +34,7 @@ function App() {
                 {activePage === 'search' && <SearchPage ref={searchPageRef} />}
                 {activePage === 'watchlist' && <WatchlistPage />}
                 {activePage === 'paper' && <PaperTradingPage />}
+                {activePage === 'comparison' && <ComparisonPage />}
                 {activePage === 'gettingStarted' && <GettingStartedPage />}
             </main>
         </div>
