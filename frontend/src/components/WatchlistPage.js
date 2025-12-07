@@ -196,6 +196,44 @@ const WatchlistPage = () => {
         }
     };
 
+    const handleExportWatchlist = () => {
+        if (watchlistData.length === 0) {
+            alert('Watchlist is empty. Add some stocks first!');
+            return;
+        }
+
+        // Create CSV headers
+        const headers = ['Symbol', 'Company Name', 'Price', 'Change', 'Change %', 'Market Cap', 'P/E Ratio', '52W High', '52W Low'];
+        
+        // Create CSV rows
+        const rows = watchlistData.map(stock => [
+            stock.ticker,
+            stock.companyName,
+            stock.price.toFixed(2),
+            stock.change.toFixed(2),
+            stock.change_percent.toFixed(2),
+            stock.marketCap || 'N/A',
+            stock.peRatio || 'N/A',
+            stock.week_52_high.toFixed(2),
+            stock.week_52_low.toFixed(2)
+        ]);
+
+        // Create CSV content
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Create blob and download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `watchlist_${new Date().toISOString().split('T')[0]}.csv`);
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
     useEffect(() => {
         setLoading(true); 
         fetchWatchlistData(); 
@@ -267,7 +305,15 @@ const WatchlistPage = () => {
 
     return (
         <div className="container mx-auto p-4 md:p-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">My Watchlist</h1>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-800">My Watchlist</h1>
+                <button
+                    onClick={handleExportWatchlist}
+                    className="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                    Export to CSV
+                </button>
+            </div>
             {sortedWatchlistData.length > 0 ? (
                 <div className="bg-white shadow-md rounded-lg overflow-x-auto">
                     <table className="min-w-full text-left text-sm">

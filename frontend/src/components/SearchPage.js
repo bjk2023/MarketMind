@@ -1,7 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { SearchIcon, TrendingUpIcon, TrendingDownIcon } from './Icons';
-import StockChart from './charts/StockChart';
-import StockDataCard from './ui/StockDataCard';
 import { Line, Chart } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -63,8 +61,23 @@ export const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFra
     const [chartType, setChartType] = useState('line');
 
     const chartConfig = useMemo(() => {
-        if (!chartData || chartData.length === 0) return null;
-        const labels = chartData.map(d => new Date(d.date));
+        if (!chartData) return null;
+        
+        // Transform API response into array of objects
+        let transformedData = chartData;
+        if (chartData.dates && Array.isArray(chartData.dates)) {
+            transformedData = chartData.dates.map((date, i) => ({
+                date,
+                open: chartData.opens?.[i] || 0,
+                high: chartData.highs?.[i] || 0,
+                low: chartData.lows?.[i] || 0,
+                close: chartData.prices?.[i] || 0,
+            }));
+        }
+        
+        if (!transformedData || transformedData.length === 0) return null;
+        
+        const labels = transformedData.map(d => new Date(d.date));
         const options = {
             responsive: true, maintainAspectRatio: false,
             plugins: {
@@ -84,12 +97,12 @@ export const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFra
             data = {
                 labels,
                 datasets: [{
-                    label: 'Price', data: chartData.map(d => d.close), fill: 'start',
+                    label: 'Price', data: transformedData.map(d => d.close), fill: 'start',
                     backgroundColor: (context) => {
                         const ctx = context.chart.ctx;
                         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                        const lastPrice = chartData[chartData.length - 1].close;
-                        const firstPrice = chartData[0].close;
+                        const lastPrice = transformedData[transformedData.length - 1].close;
+                        const firstPrice = transformedData[0].close;
                         const isUp = lastPrice >= firstPrice;
                         gradient.addColorStop(0, isUp ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)');
                         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -105,7 +118,7 @@ export const StockChart = ({ chartData, ticker, onTimeFrameChange, activeTimeFra
              data = {
                 datasets: [{
                     label: `${ticker} OHLC`,
-                    data: chartData.map(d => ({ x: new Date(d.date).valueOf(), o: d.open, h: d.high, l: d.low, c: d.close }))
+                    data: transformedData.map(d => ({ x: new Date(d.date).valueOf(), o: d.open, h: d.high, l: d.low, c: d.close }))
                 }]
             };
             ChartComponent = Chart;
@@ -319,7 +332,7 @@ const StockNewsCard = ({ newsData }) => {
 };
 
 
-const SearchPage = () => {
+const SearchPageComponent = forwardRef((_, ref) => {
     const [ticker, setTicker] = useState('');
     const [searchedTicker, setSearchedTicker] = useState('');
     const [stockData, setStockData] = useState(null);
@@ -331,6 +344,17 @@ const SearchPage = () => {
     const [newsLoading, setNewsLoading] = useState(false); 
 
     const [error, setError] = useState('');
+
+    // Expose performSearch method to parent
+    useImperativeHandle(ref, () => ({
+        performSearch: (tickerSymbol) => {
+            setTicker(tickerSymbol);
+            // Trigger search in the next render
+            setTimeout(() => {
+                handleSearch({ preventDefault: () => {} }, tickerSymbol);
+            }, 0);
+        }
+    }));
 
     const fetchChartData = async (symbol, timeFrame) => {
         setChartLoading(true);
@@ -363,9 +387,11 @@ const SearchPage = () => {
         }
     };
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        if (!ticker) return;
+    const handleSearch = async (e, tickerOverride = null) => {
+        if (e && e.preventDefault) e.preventDefault();
+        
+        const searchTicker = tickerOverride || ticker;
+        if (!searchTicker) return;
 
         setLoading(true);
         setStockData(null);
@@ -378,18 +404,18 @@ const SearchPage = () => {
 
         try {
             // Fetch the combined stock data
-            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${ticker}`);
+            const stockResponse = await fetch(`http://127.0.0.1:5001/stock/${searchTicker}`);
             if (!stockResponse.ok) {
                 const errorData = await stockResponse.json();
                 throw new Error(errorData.error || 'Stock data not found');
             }
             const stockJson = await stockResponse.json();
             setStockData(stockJson); 
-            setSearchedTicker(ticker);
+            setSearchedTicker(searchTicker);
 
             // Now fetch chart and news in parallel
             await Promise.all([
-                fetchChartData(ticker, defaultTimeFrame),
+                fetchChartData(searchTicker, defaultTimeFrame),
                 fetchNewsData(stockJson.companyName) // Pass company name to news
             ]);
 
@@ -412,10 +438,18 @@ const SearchPage = () => {
         try {
             const response = await fetch(`http://127.0.0.1:5001/watchlist/${tickerToAdd}`, {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
             });
             const result = await response.json();
-            alert(result.message);
+            if (response.ok) {
+                alert(result.message || `${tickerToAdd} added to watchlist!`);
+            } else {
+                alert(result.error || result.message || 'Failed to add to watchlist');
+            }
         } catch (err) {
+            console.error('Watchlist error:', err);
             alert('Failed to add stock to watchlist. Is the server running?');
         }
     };
@@ -484,6 +518,7 @@ const SearchPage = () => {
             </div>
         </div>
     );
-};
+});
 
-export default SearchPage;
+SearchPageComponent.displayName = 'SearchPage';
+export default SearchPageComponent;
