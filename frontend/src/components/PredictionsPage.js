@@ -4,40 +4,50 @@ import PredictionChart from './charts/PredictionChart';
 import ModelComparisonCard from './ui/ModelComparisonCard';
 import { SearchIcon } from './Icons';
 
+// Defines the Predictions Page component
 const PredictionsPage = ({ initialTicker }) => {
+    // Component State
     const [ticker, setTicker] = useState('');
     const [predictionData, setPredictionData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    // Toggle to switch between the combined Ensemble model (3 models) and a simpler Single model
     const [useEnsemble, setUseEnsemble] = useState(true);
 
-    // Auto-search when initialTicker is provided or ensemble mode changes
+    // Effect Hook: Triggers search when navigated from another page (via initialTicker) 
+    // or when the user toggles between Ensemble and Single model view.
     useEffect(() => {
         if (initialTicker && initialTicker.trim()) {
             setTicker(initialTicker);
             fetchPredictions(initialTicker);
         }
+    // Dependency array ensures this runs when initialTicker or useEnsemble changes.
     }, [initialTicker, useEnsemble]);
 
+    // Function to fetch price predictions from the Flask backend
     const fetchPredictions = async (searchTicker) => {
         setLoading(true);
         setError('');
         setPredictionData(null);
 
         try {
-            const endpoint = useEnsemble 
+            // Determine the correct API endpoint based on the Ensemble toggle state
+            const API_ENDPOINT = useEnsemble 
                 ? `http://localhost:5001/predict/ensemble/${searchTicker.toUpperCase()}`
                 : `http://localhost:5001/predict/${searchTicker.toUpperCase()}`;
             
-            const response = await fetch(endpoint);
+            const response = await fetch(API_ENDPOINT);
             
             if (!response.ok) {
+                // Throw error if API response status is not 200 OK
                 throw new Error('Failed to fetch prediction data');
             }
 
             const data = await response.json();
+            // Store the fetched data, which contains prices, model breakdown, and confidence
             setPredictionData(data);
         } catch (err) {
+            // Display a user-friendly error message
             setError(`Error: Could not fetch predictions for ${searchTicker.toUpperCase()}. Please check the ticker and try again.`);
             console.error('Prediction fetch error:', err);
         } finally {
@@ -45,6 +55,7 @@ const PredictionsPage = ({ initialTicker }) => {
         }
     };
 
+    // Handler for the main search button click
     const handleSearch = async (e) => {
         e.preventDefault();
         
@@ -53,11 +64,13 @@ const PredictionsPage = ({ initialTicker }) => {
             return;
         }
 
+        // Initiate the data fetching process
         fetchPredictions(ticker);
     };
 
     return (
         <div className="container mx-auto px-6 py-8 max-w-5xl">
+            {/* Header Section */}
             <div className="text-center mb-8 animate-fade-in">
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
                     Stock Price Predictions
@@ -67,11 +80,12 @@ const PredictionsPage = ({ initialTicker }) => {
                 </p>
             </div>
 
-            {/* Search Form */}
+            {/* Prediction Search Form and Model Toggle */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 animate-fade-in transition-colors duration-200">
                 <form onSubmit={handleSearch} className="flex gap-4">
                     <div className="flex-1">
                         <div className="relative">
+                            {/* Ticker Input Field */}
                             <input
                                 type="text"
                                 value={ticker}
@@ -82,6 +96,7 @@ const PredictionsPage = ({ initialTicker }) => {
                             <SearchIcon className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         </div>
                     </div>
+                    {/* Predict Button */}
                     <button
                         type="submit"
                         disabled={loading}
@@ -95,7 +110,7 @@ const PredictionsPage = ({ initialTicker }) => {
                     </button>
                 </form>
                 
-                {/* Ensemble Toggle */}
+                {/* Ensemble/Single Model Toggle Button */}
                 <div className="mt-4 flex items-center justify-center">
                     <button
                         onClick={() => setUseEnsemble(!useEnsemble)}
@@ -105,6 +120,7 @@ const PredictionsPage = ({ initialTicker }) => {
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                         }`}
                     >
+                        {/* Icon represents a combination of models */}
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                         </svg>
@@ -113,14 +129,14 @@ const PredictionsPage = ({ initialTicker }) => {
                 </div>
             </div>
 
-            {/* Error Message */}
+            {/* Error Message Display */}
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-6 py-4 rounded-lg mb-8 animate-fade-in">
                     <p className="font-medium">{error}</p>
                 </div>
             )}
 
-            {/* Loading State */}
+            {/* Loading Spinner */}
             {loading && (
                 <div className="text-center py-12 animate-fade-in">
                     <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
@@ -128,9 +144,10 @@ const PredictionsPage = ({ initialTicker }) => {
                 </div>
             )}
 
-            {/* Prediction Results */}
+            {/* Prediction Results Display */}
             {predictionData && !loading && (
                 <div className="animate-fade-in">
+                    {/* Summary Card with Actual vs Predicted Close */}
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-6 mb-6 border border-blue-100 dark:border-blue-800">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="text-center">
@@ -148,8 +165,10 @@ const PredictionsPage = ({ initialTicker }) => {
                         </div>
                     </div>
 
+                    {/* Chart Visualization */}
                     <PredictionChart predictionData={predictionData} />
 
+                    {/* Model Breakdown (Only shown in Ensemble Mode) */}
                     {useEnsemble && predictionData.modelBreakdown && (
                         <ModelComparisonCard 
                             modelBreakdown={predictionData.modelBreakdown}
@@ -158,8 +177,10 @@ const PredictionsPage = ({ initialTicker }) => {
                         />
                     )}
 
+                    {/* Detailed Future Predictions List */}
                     <StockPredictionCard data={predictionData} />
 
+                    {/* Disclaimer and Information */}
                     <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">About These Predictions</h3>
                         <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
@@ -172,7 +193,7 @@ const PredictionsPage = ({ initialTicker }) => {
                 </div>
             )}
 
-            {/* Empty State */}
+            {/* Empty State / Initial View */}
             {!predictionData && !loading && !error && (
                 <div className="text-center py-16 animate-fade-in">
                     <div className="inline-block p-6 bg-gray-100 rounded-full mb-4">
