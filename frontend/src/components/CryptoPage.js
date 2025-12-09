@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from 'react';
+// Import necessary icons from Lucide
 import { Bitcoin, RefreshCw } from 'lucide-react';
 
+// Defines the API base URL, defaulting to local host for development
+const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
+
 const CryptoPage = () => {
-    const [cryptos, setCryptos] = useState([]);
-    const [currencies, setCurrencies] = useState([]);
+    // State for data fetched from the API
+    const [cryptos, setCryptos] = useState([]); // List of available cryptocurrencies
+    const [currencies, setCurrencies] = useState([]); // List of target fiat currencies
+    
+    // State for user selection and input
     const [fromCrypto, setFromCrypto] = useState('BTC');
     const [toCurrency, setToCurrency] = useState('USD');
     const [amount, setAmount] = useState(1);
+    
+    // State for the conversion result and status
     const [exchangeData, setExchangeData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // Popular crypto pairs for quick access
+    // Predefined popular conversion pairs for quick access buttons
     const popularPairs = [
         { from: 'BTC', to: 'USD', label: 'BTC → USD' },
         { from: 'ETH', to: 'USD', label: 'ETH → USD' },
@@ -21,16 +30,18 @@ const CryptoPage = () => {
         { from: 'DOGE', to: 'USD', label: 'DOGE → USD' },
     ];
 
-    // Fetch available cryptos and currencies on mount
+    // Effect Hook: Fetches initial data on component mount
     useEffect(() => {
         fetchCryptos();
         fetchCurrencies();
-        handleConvert(); // Initial conversion
-    }, []);
+        handleConvert(); // Run an initial conversion for default pair (BTC/USD)
+    }, []); // Empty dependency array ensures this runs only once
 
+    // API Call to fetch the list of available crypto assets
     const fetchCryptos = async () => {
         try {
-            const response = await fetch('http://localhost:5001/crypto/list');
+            // FIX: Corrected template literal syntax from single quotes to backticks (``)
+            const response = await fetch(`${API_URL}/crypto/list`);
             const data = await response.json();
             setCryptos(data);
         } catch (err) {
@@ -38,9 +49,11 @@ const CryptoPage = () => {
         }
     };
 
+    // API Call to fetch the list of available target fiat currencies
     const fetchCurrencies = async () => {
         try {
-            const response = await fetch('http://localhost:5001/crypto/currencies');
+            // FIX: Corrected template literal syntax
+            const response = await fetch(`${API_URL}/crypto/currencies`);
             const data = await response.json();
             setCurrencies(data);
         } catch (err) {
@@ -48,13 +61,14 @@ const CryptoPage = () => {
         }
     };
 
+    // API Call to fetch the actual exchange rate and current prices
     const handleConvert = async () => {
         setLoading(true);
         setError('');
         
         try {
             const response = await fetch(
-                `http://localhost:5001/crypto/convert?from=${fromCrypto}&to=${toCurrency}`
+                `${API_URL}/crypto/convert?from=${fromCrypto}&to=${toCurrency}`
             );
             
             if (!response.ok) {
@@ -71,18 +85,21 @@ const CryptoPage = () => {
         }
     };
 
+    // Handler for the popular quick-access buttons
     const handleQuickPair = (from, to) => {
         setFromCrypto(from);
         setToCurrency(to);
-        setTimeout(handleConvert, 100);
+        // Delay conversion slightly to ensure state update is processed
+        setTimeout(handleConvert, 100); 
     };
 
+    // Derived values for display
     const convertedAmount = exchangeData ? (amount * exchangeData.exchange_rate).toFixed(2) : '0.00';
     const formattedRate = exchangeData ? exchangeData.exchange_rate.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00';
 
     return (
         <div className="container mx-auto px-6 py-8 max-w-6xl">
-            {/* Header */}
+            {/* Header Section */}
             <div className="text-center mb-8 animate-fade-in">
                 <div className="flex items-center justify-center mb-2">
                     <Bitcoin className="w-10 h-10 text-purple-600 dark:text-purple-400 mr-3" />
@@ -100,7 +117,7 @@ const CryptoPage = () => {
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Crypto Converter</h2>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                    {/* From Crypto */}
+                    {/* Input: Amount and From Crypto Selection */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             From Cryptocurrency
@@ -120,6 +137,7 @@ const CryptoPage = () => {
                                 onChange={(e) => setFromCrypto(e.target.value)}
                                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
                             >
+                                {/* Populate options from fetched cryptos */}
                                 {cryptos.map((crypto) => (
                                     <option key={crypto.code} value={crypto.code}>
                                         {crypto.icon} {crypto.code} - {crypto.name}
@@ -129,12 +147,13 @@ const CryptoPage = () => {
                         </div>
                     </div>
 
-                    {/* To Currency */}
+                    {/* Output: Converted Amount and To Currency Selection */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             To Fiat Currency
                         </label>
                         <div className="space-y-2">
+                            {/* Display the calculated converted amount */}
                             <div className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-lg font-bold text-lg bg-gray-50">
                                 {loading ? '...' : `${currencies.find(c => c.code === toCurrency)?.symbol || '$'}${convertedAmount}`}
                             </div>
@@ -143,6 +162,7 @@ const CryptoPage = () => {
                                 onChange={(e) => setToCurrency(e.target.value)}
                                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
                             >
+                                {/* Populate options from fetched fiat currencies */}
                                 {currencies.map((curr) => (
                                     <option key={curr.code} value={curr.code}>
                                         {curr.flag} {curr.code} - {curr.name}
@@ -168,7 +188,7 @@ const CryptoPage = () => {
                     </button>
                 </div>
 
-                {/* Error Message */}
+                {/* Error Message and Retry Button */}
                 {error && (
                     <div className="mt-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg flex items-center justify-between">
                         <span>{error}</span>
@@ -186,10 +206,11 @@ const CryptoPage = () => {
                 )}
             </div>
 
-            {/* Exchange Rate Details */}
+            {/* Exchange Rate Details Card */}
             {exchangeData && !loading && (
                 <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl p-6 mb-8 animate-fade-in border border-purple-100 dark:border-purple-800">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                        {/* Current Exchange Rate */}
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Exchange Rate</p>
                             <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -199,18 +220,21 @@ const CryptoPage = () => {
                                 1 {exchangeData.from_crypto.code} = ${exchangeData.exchange_rate.toLocaleString(undefined, {maximumFractionDigits: 2})} {exchangeData.to_currency.code}
                             </p>
                         </div>
+                        {/* Bid Price */}
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Bid Price</p>
                             <p className="text-xl font-bold text-green-600 dark:text-green-400">
                                 ${exchangeData.bid_price.toLocaleString(undefined, {maximumFractionDigits: 2})}
                             </p>
                         </div>
+                        {/* Ask Price */}
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ask Price</p>
                             <p className="text-xl font-bold text-red-600 dark:text-red-400">
                                 ${exchangeData.ask_price.toLocaleString(undefined, {maximumFractionDigits: 2})}
                             </p>
                         </div>
+                        {/* Last Updated Timezone */}
                         <div>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Last Updated</p>
                             <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -224,7 +248,7 @@ const CryptoPage = () => {
                 </div>
             )}
 
-            {/* Popular Pairs */}
+            {/* Popular Pairs Quick Buttons */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 animate-fade-in">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Popular Cryptocurrencies</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -244,13 +268,14 @@ const CryptoPage = () => {
                 </div>
             </div>
 
-            {/* Crypto Info Grid */}
+            {/* Crypto Info Grid (Top 8 Cryptos) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in">
                 {cryptos.slice(0, 8).map((crypto) => (
                     <button
                         key={crypto.code}
                         onClick={() => {
                             setFromCrypto(crypto.code);
+                            // Trigger conversion for the newly selected crypto
                             setTimeout(handleConvert, 100);
                         }}
                         className="bg-white dark:bg-gray-800 rounded-lg p-4 hover:shadow-lg transition-all active:scale-95 text-left"
@@ -266,7 +291,7 @@ const CryptoPage = () => {
                 ))}
             </div>
 
-            {/* Info Note */}
+            {/* Info Note / Disclaimer */}
             <div className="mt-8 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4 animate-fade-in">
                 <p className="text-sm text-purple-800 dark:text-purple-300">
                     <strong>Note:</strong> Cryptocurrency prices are highly volatile and provided by Alpha Vantage. 
