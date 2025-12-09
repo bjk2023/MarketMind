@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
+// Import necessary icons from Lucide
 import { Building2, Search, TrendingUp, DollarSign, BarChart3, Target, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
+// Defines the API base URL, defaulting to local host for development
+const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
+
 const FundamentalsPage = () => {
+    // State to manage user input and search results
     const [ticker, setTicker] = useState('');
     const [fundamentals, setFundamentals] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Handles the search form submission
     const handleSearch = async (e) => {
         e.preventDefault();
         if (!ticker.trim()) return;
@@ -16,10 +22,12 @@ const FundamentalsPage = () => {
         setFundamentals(null);
 
         try {
-            const response = await fetch(`http://localhost:5001/fundamentals/${ticker.toUpperCase()}`);
+            // Fetch company fundamentals from the backend using Alpha Vantage API
+            const response = await fetch(`${API_URL}/fundamentals/${ticker.toUpperCase()}`);
             const data = await response.json();
 
             if (!response.ok) {
+                // If the response is not OK (e.g., 404), throw an error
                 throw new Error(data.error || 'Failed to fetch fundamentals');
             }
 
@@ -32,11 +40,13 @@ const FundamentalsPage = () => {
         }
     };
 
+    // Helper function to format large numbers (Market Cap, Revenue, etc.) into M, B, or T format
     const formatNumber = (value, prefix = '', suffix = '') => {
         if (value === 'N/A' || value === 'None' || !value) return 'N/A';
         const num = parseFloat(value);
         if (isNaN(num)) return value;
         
+        // Check for Trillions (T), Billions (B), Millions (M)
         if (Math.abs(num) >= 1e12) {
             return `${prefix}${(num / 1e12).toFixed(2)}T${suffix}`;
         } else if (Math.abs(num) >= 1e9) {
@@ -44,20 +54,25 @@ const FundamentalsPage = () => {
         } else if (Math.abs(num) >= 1e6) {
             return `${prefix}${(num / 1e6).toFixed(2)}M${suffix}`;
         } else {
+            // Default formatting for smaller numbers
             return `${prefix}${num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}${suffix}`;
         }
     };
 
+    // Helper function to format decimal values as percentages
     const formatPercent = (value) => {
         if (value === 'N/A' || value === 'None' || !value) return 'N/A';
         const num = parseFloat(value);
         if (isNaN(num)) return value;
+        // Multiplies by 100 and adds the percentage symbol
         return `${(num * 100).toFixed(2)}%`;
     };
 
+    // Reusable component to display a single financial metric
     const MetricCard = ({ title, value, icon: Icon, color = 'blue', format = 'default' }) => {
         let displayValue = value;
         
+        // Apply the correct formatting based on the 'format' prop
         if (format === 'currency') {
             displayValue = formatNumber(value, '$');
         } else if (format === 'percent') {
@@ -70,6 +85,7 @@ const FundamentalsPage = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400">{title}</span>
+                    {/* Render the icon if provided */}
                     {Icon && <Icon className={`w-4 h-4 text-${color}-600 dark:text-${color}-400`} />}
                 </div>
                 <p className="text-xl font-bold text-gray-900 dark:text-white">
@@ -107,6 +123,7 @@ const FundamentalsPage = () => {
                             className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                         />
                     </div>
+                    {/* Search Button */}
                     <button
                         type="submit"
                         disabled={loading || !ticker.trim()}
@@ -136,10 +153,11 @@ const FundamentalsPage = () => {
                 </div>
             )}
 
-            {/* Fundamentals Data */}
+            {/* --- Main Fundamentals Display --- */}
             {fundamentals && !loading && (
                 <div className="space-y-6 animate-fade-in">
-                    {/* Company Overview */}
+                    
+                    {/* Company Overview (Name, Symbol, Description, Sector) */}
                     <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-xl p-8 border border-indigo-100 dark:border-indigo-800">
                         <div className="flex items-start justify-between mb-4">
                             <div>
@@ -154,6 +172,7 @@ const FundamentalsPage = () => {
                                     <span>{fundamentals.currency}</span>
                                 </div>
                             </div>
+                            {/* Sector/Industry Detail */}
                             <div className="text-right">
                                 <p className="text-sm text-gray-600 dark:text-gray-400">Sector</p>
                                 <p className="text-lg font-bold text-gray-900 dark:text-white">{fundamentals.sector}</p>
@@ -161,6 +180,7 @@ const FundamentalsPage = () => {
                             </div>
                         </div>
                         
+                        {/* Company Description (Optional) */}
                         {fundamentals.description !== 'N/A' && (
                             <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                                 {fundamentals.description}
@@ -168,21 +188,25 @@ const FundamentalsPage = () => {
                         )}
                     </div>
 
-                    {/* Key Metrics */}
+                    {/* Key Metrics Section */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
                             <BarChart3 className="w-6 h-6 mr-2 text-indigo-600" />
                             Key Metrics
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Market Capitalization (T, B, M formatting) */}
                             <MetricCard title="Market Cap" value={fundamentals.market_cap} icon={DollarSign} format="currency" color="green" />
+                            {/* Price-to-Earnings Ratio */}
                             <MetricCard title="P/E Ratio" value={fundamentals.pe_ratio} icon={Target} format="number" color="blue" />
+                            {/* Earnings Per Share */}
                             <MetricCard title="EPS" value={fundamentals.eps} icon={TrendingUp} format="currency" color="purple" />
+                            {/* Beta (Volatility) */}
                             <MetricCard title="Beta" value={fundamentals.beta} icon={BarChart3} format="number" color="orange" />
                         </div>
                     </div>
 
-                    {/* Valuation Metrics */}
+                    {/* Valuation Metrics Section */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Valuation Metrics</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -195,7 +219,7 @@ const FundamentalsPage = () => {
                         </div>
                     </div>
 
-                    {/* Profitability */}
+                    {/* Profitability Section */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Profitability</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -206,7 +230,7 @@ const FundamentalsPage = () => {
                         </div>
                     </div>
 
-                    {/* Financial Performance */}
+                    {/* Financial Performance Section */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Financial Performance</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -214,12 +238,13 @@ const FundamentalsPage = () => {
                             <MetricCard title="Gross Profit (TTM)" value={fundamentals.gross_profit_ttm} format="currency" />
                             <MetricCard title="Diluted EPS (TTM)" value={fundamentals.diluted_eps_ttm} format="currency" />
                             <MetricCard title="Revenue/Share (TTM)" value={fundamentals.revenue_per_share_ttm} format="currency" />
+                            {/* Year-over-Year Growth Metrics */}
                             <MetricCard title="Quarterly Earnings Growth" value={fundamentals.quarterly_earnings_growth_yoy} format="percent" />
                             <MetricCard title="Quarterly Revenue Growth" value={fundamentals.quarterly_revenue_growth_yoy} format="percent" />
                         </div>
                     </div>
 
-                    {/* Price & Technicals */}
+                    {/* Price & Technicals Section */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Price & Technicals</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -230,7 +255,7 @@ const FundamentalsPage = () => {
                         </div>
                     </div>
 
-                    {/* Dividend Information */}
+                    {/* Dividend Information (Only renders if DPS > 0 or not N/A) */}
                     {(fundamentals.dividend_per_share !== 'N/A' && fundamentals.dividend_per_share !== '0') && (
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                             <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
@@ -246,7 +271,7 @@ const FundamentalsPage = () => {
                         </div>
                     )}
 
-                    {/* Additional Info */}
+                    {/* Additional Information */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Additional Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -260,7 +285,7 @@ const FundamentalsPage = () => {
                 </div>
             )}
 
-            {/* Empty State */}
+            {/* Empty State / Initial View */}
             {!fundamentals && !loading && !error && (
                 <div className="text-center py-12">
                     <Building2 className="w-24 h-24 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
