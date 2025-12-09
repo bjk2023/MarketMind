@@ -1,15 +1,23 @@
 import React, { useState } from 'react';
-import { SearchIcon } from './Icons';
-import ActualVsPredictedChart from './charts/ActualVsPredictedChart';
+// Import necessary icons from Lucide
+import { Search, TrendingUp, DollarSign, BarChart3, Target, Calendar, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+
+// Defines the API base URL, defaulting to local host for development
+const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5001';
 
 const ModelPerformancePage = () => {
+    // State for user input and backtesting parameters
     const [ticker, setTicker] = useState('');
+    const [testDays, setTestDays] = useState(60); // Number of days for the rolling window backtest
+
+    // State for fetching status and results
     const [evaluationData, setEvaluationData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [selectedModel, setSelectedModel] = useState('ensemble');
-    const [testDays, setTestDays] = useState(60);
+    // State to control which model's prediction line is currently displayed on the chart
+    const [selectedModel, setSelectedModel] = useState('ensemble'); 
 
+    // Handles the backtesting evaluation form submission
     const handleEvaluate = async (e) => {
         e.preventDefault();
         
@@ -23,14 +31,20 @@ const ModelPerformancePage = () => {
         setEvaluationData(null);
 
         try {
-            const response = await fetch(`http://localhost:5001/evaluate/${ticker.toUpperCase()}?test_days=${testDays}`);
+            // API call to the backend backtesting endpoint
+            // Sends the ticker and the desired number of test days
+            const response = await fetch(`${API_URL}/evaluate/${ticker.toUpperCase()}?test_days=${testDays}`);
             
             if (!response.ok) {
-                throw new Error('Failed to evaluate model');
+                // If the backend returns a non-200 status, parse and throw the error
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to evaluate model');
             }
 
             const data = await response.json();
             setEvaluationData(data);
+            // Set the default displayed model to 'ensemble' after a successful fetch
+            setSelectedModel('ensemble'); 
         } catch (err) {
             setError(`Error: Could not evaluate ${ticker.toUpperCase()}. Please check the ticker and try again.`);
             console.error('Evaluation error:', err);
@@ -51,10 +65,11 @@ const ModelPerformancePage = () => {
                 </p>
             </div>
 
-            {/* Search Form */}
+            {/* Search and Parameter Form */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 animate-fade-in transition-colors duration-200">
                 <form onSubmit={handleEvaluate} className="space-y-4">
                     <div className="flex gap-4">
+                        {/* Ticker Input */}
                         <div className="flex-1">
                             <div className="relative">
                                 <input
@@ -68,6 +83,7 @@ const ModelPerformancePage = () => {
                             </div>
                         </div>
                         
+                        {/* Test Days Dropdown */}
                         <div className="w-48">
                             <select
                                 value={testDays}
@@ -81,6 +97,7 @@ const ModelPerformancePage = () => {
                             </select>
                         </div>
 
+                        {/* Evaluate Button */}
                         <button
                             type="submit"
                             disabled={loading}
@@ -116,9 +133,10 @@ const ModelPerformancePage = () => {
                 </div>
             )}
 
-            {/* Results */}
+            {/* --- Results Display --- */}
             {evaluationData && !loading && (
                 <div className="animate-fade-in space-y-8">
+                    
                     {/* Summary Card */}
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-xl p-6 border border-blue-100 dark:border-blue-800">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
@@ -133,6 +151,7 @@ const ModelPerformancePage = () => {
                             </div>
                             <div>
                                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Best Model</p>
+                                {/* Highlight the best performing model based on metrics */}
                                 <p className="text-lg font-bold text-green-600 dark:text-green-400">{evaluationData.best_model.replace('_', ' ').toUpperCase()}</p>
                             </div>
                             <div>
@@ -142,7 +161,7 @@ const ModelPerformancePage = () => {
                         </div>
                     </div>
 
-                    {/* Model Selector */}
+                    {/* Model Selector for Chart */}
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Select Model to View:</h3>
                         <div className="flex flex-wrap gap-3">
@@ -152,23 +171,23 @@ const ModelPerformancePage = () => {
                                     onClick={() => setSelectedModel(modelName)}
                                     className={`px-6 py-3 rounded-lg font-semibold transition-all ${
                                         selectedModel === modelName
-                                            ? 'bg-purple-600 text-white'
+                                            ? 'bg-purple-600 text-white' // Highlight selected model
                                             : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-purple-100 dark:hover:bg-purple-900/30'
                                     }`}
                                 >
                                     {modelName.replace('_', ' ').toUpperCase()}
                                     {modelName === evaluationData.best_model && (
-                                        <span className="ml-2">🏆</span>
+                                        <span className="ml-2">🏆</span> // Trophy icon for the best model
                                     )}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Actual vs Predicted Chart */}
+                    {/* Actual vs Predicted Chart Component */}
                     <ActualVsPredictedChart 
                         evaluationData={evaluationData}
-                        selectedModel={selectedModel}
+                        selectedModel={selectedModel} // Passes state to control which model's line is shown
                     />
 
                     {/* Model Comparison Table */}
@@ -187,23 +206,29 @@ const ModelPerformancePage = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    {/* Iterate over all models to display their performance metrics */}
                                     {Object.entries(evaluationData.models).map(([modelName, data]) => {
                                         const isBest = modelName === evaluationData.best_model;
                                         return (
                                             <tr 
                                                 key={modelName}
                                                 className={`border-b border-gray-200 dark:border-gray-700 ${
-                                                    isBest ? 'bg-green-50 dark:bg-green-900/20' : ''
+                                                    isBest ? 'bg-green-50 dark:bg-green-900/20' : '' // Highlight the best model's row
                                                 }`}
                                             >
                                                 <td className="py-3 px-4 font-bold text-gray-800 dark:text-gray-200">
                                                     {modelName.replace('_', ' ').toUpperCase()}
                                                     {isBest && <span className="ml-2">🏆</span>}
                                                 </td>
+                                                {/* MAE: Mean Absolute Error (Average dollar error) */}
                                                 <td className="text-center py-3 px-4 dark:text-gray-300">${data.metrics.mae}</td>
+                                                {/* RMSE: Root Mean Square Error */}
                                                 <td className="text-center py-3 px-4 dark:text-gray-300">${data.metrics.rmse}</td>
+                                                {/* MAPE: Mean Absolute Percentage Error (Average percentage error) */}
                                                 <td className="text-center py-3 px-4 font-medium text-purple-600 dark:text-purple-400">{data.metrics.mape}%</td>
+                                                {/* R²: Coefficient of Determination (Model Fit Accuracy) */}
                                                 <td className="text-center py-3 px-4 font-medium text-green-600 dark:text-green-400">{data.metrics.r_squared}</td>
+                                                {/* Directional Accuracy: Percentage of correct Up/Down predictions */}
                                                 <td className="text-center py-3 px-4 font-medium text-blue-600 dark:text-blue-400">{data.metrics.directional_accuracy}%</td>
                                             </tr>
                                         );
@@ -213,11 +238,12 @@ const ModelPerformancePage = () => {
                         </div>
                     </div>
 
-                    {/* Trading Performance */}
+                    {/* Trading Performance Metrics (If available in the backtest data) */}
                     {evaluationData.returns && (
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Trading Performance (Ensemble Strategy)</h3>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                {/* Backtest Results */}
                                 <div className="text-center">
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Initial Capital</p>
                                     <p className="text-2xl font-bold text-gray-900 dark:text-white">${evaluationData.returns.initial_capital}</p>
@@ -238,6 +264,7 @@ const ModelPerformancePage = () => {
                                         {evaluationData.returns.outperformance > 0 ? '+' : ''}{evaluationData.returns.outperformance}%
                                     </p>
                                 </div>
+                                {/* Risk Metrics */}
                                 <div className="text-center">
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Sharpe Ratio</p>
                                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{evaluationData.returns.sharpe_ratio}</p>
@@ -254,7 +281,7 @@ const ModelPerformancePage = () => {
                         </div>
                     )}
 
-                    {/* Educational Note */}
+                    {/* Educational Note / Disclaimer */}
                     <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                         <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 mb-2">About This Evaluation</h3>
                         <ul className="text-sm text-yellow-800 dark:text-yellow-300 space-y-1">
@@ -268,7 +295,7 @@ const ModelPerformancePage = () => {
                 </div>
             )}
 
-            {/* Empty State */}
+            {/* Empty State / Initial View */}
             {!evaluationData && !loading && !error && (
                 <div className="text-center py-16 animate-fade-in">
                     <div className="inline-block p-6 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
