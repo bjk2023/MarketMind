@@ -1,4 +1,9 @@
-Design Fundamentals of Diffusion Models
+## Diffusion Modeling Research Notes
+
+- Diffusion models simulate data generation by reversing noise processes
+- Useful for probabilistic forecasting
+- Provides uncertainty quantification
+- Good candidate for future MarketMind forecasting modules
 
 (Application to stock tracker: probabilistic forecasting & scenario generation)
 
