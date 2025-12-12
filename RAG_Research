@@ -1,0 +1,10 @@
+https://arxiv.org/abs/2410.12837?utm_source
+Retrieval-Augmented Generation (RAG)
+
+(Application to stock tracker: grounded insights and reduced hallucination)
+
+RAG systems integrate external data sources into language model outputs, making them highly relevant for stock trackers that synthesize real-time information. Financial markets demand accuracy, and RAG allows a tracker to ground generated insights in retrieved data such as SEC filings, news articles, or historical price movements.
+
+The survey’s classification of retrieval architectures informs system design choices. A stock tracker could use dense vector retrieval for earnings transcripts and sparse retrieval for regulatory filings, combining both for robust coverage. This improves the credibility of generated explanations, predictions, and alerts presented to users.
+
+By reducing hallucinations, RAG enhances trustworthiness — a critical requirement for financial tools. The stock tracker benefits by being able to cite sources and show supporting evidence, transforming it from a black-box predictor into a transparent decision-support system.
