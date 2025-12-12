@@ -1,0 +1,9 @@
+Design Fundamentals of Diffusion Models
+
+(Application to stock tracker: probabilistic forecasting & scenario generation)
+
+Diffusion models are well-suited for modeling uncertainty, which is inherent in stock price movements. Rather than producing a single deterministic forecast, diffusion-based approaches allow a stock tracker to generate distributions of possible future prices, supporting risk-aware decision-making.
+
+The paper’s exploration of noise schedules and sampling strategies informs how uncertainty can be controlled in financial simulations. For example, a tracker could adjust noise levels to generate conservative or aggressive forecast scenarios, aiding stress testing and portfolio risk evaluation.
+
+Although computationally expensive, diffusion models could be selectively applied to high-impact assets or macro indices. This aligns with the tracker’s need to balance accuracy and efficiency while offering advanced probabilistic insights beyond traditional time-series models.
