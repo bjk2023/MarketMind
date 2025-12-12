@@ -1,3 +1,12 @@
+## Research Summary
+
+This document summarizes key research topics for MarketMind:
+
+- Differences between machine learning and linear regression
+- Importance of nonlinear models for financial prediction
+- Integration of sentiment and technical indicators
+- Accuracy improvements and model evaluation
+
 Article I found for ML forcasting applied to stock market: https://www.mdpi.com/2673-9909/5/3/76
 Advantages to ML algorithm:
   - Eliminates human Biases
