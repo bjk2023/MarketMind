@@ -1,3 +1,9 @@
+"""
+try_1_inflation.py
+
+Experimental script to test inflation data retrieval and integration with stock metrics.
+Intended for research and prototyping only.
+"""
 import yfinance as yf
 import requests
 from datetime import datetime
@@ -58,4 +64,5 @@ if __name__ == "__main__":
     print(f"Current {stock} Price: ${current_price:.2f}")
     print(f"Inflation Rate: {inflation_rate:.2f}% annual")
     print(f"Predicted Price in 1 Month: ${predicted_price:.2f}")
+
     #first step to show graph would be to get more data points/ calulate on smaller incre,=ments but for now this works
