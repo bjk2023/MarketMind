@@ -1,0 +1,9 @@
+Foundation Models for Time Series Forecasting
+
+(Application to stock tracker: price prediction and trend detection)
+
+Time series foundation models represent a major shift in financial forecasting by enabling transfer learning across markets and assets. The survey demonstrates how transformers capture long-range dependencies, which are common in stock prices influenced by macroeconomic cycles and investor sentiment.
+
+For the stock tracker, these models allow unified forecasting across multiple equities rather than training a separate model per stock. This supports scalable monitoring of large portfolios and improves performance on thinly traded or newly listed stocks through shared representations.
+
+The paper’s discussion of limitations — particularly interpretability — is critical. The tracker must pair predictions with explanatory signals (e.g., indicators or retrieved news) to remain user-friendly and trustworthy. Thus, foundation models inform forecasting, while complementary modules handle explainability.
