@@ -1,0 +1,7 @@
+Low-Rank Adaptation (LoRA) for Foundation Models: https://arxiv.org/abs
+
+This survey focuses on Low-Rank Adaptation (LoRA), a parameter-efficient fine-tuning technique designed to adapt large pretrained models without updating all weights. Instead, LoRA introduces low-rank matrices into attention and feed-forward layers, drastically reducing the number of trainable parameters. This approach enables fine-tuning of billion-parameter models on consumer-grade hardware while preserving performance.
+
+The paper systematically compares LoRA to other adaptation methods such as full fine-tuning, prefix tuning, adapters, and prompt tuning. The authors show that LoRA achieves comparable or superior performance on downstream tasks while using orders of magnitude fewer parameters. Additionally, LoRA’s modularity allows multiple task-specific adaptations to be swapped in and out without modifying the base model.
+
+The survey concludes by discussing practical deployment advantages, including reduced storage requirements and faster training times. Limitations include sensitivity to rank selection and potential instability in very deep architectures. Nonetheless, LoRA is presented as a foundational technique enabling scalable experimentation and democratized access to large language and vision models.
