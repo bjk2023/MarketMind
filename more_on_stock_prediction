@@ -1,3 +1,9 @@
+## Stock Market Research
+
+- Stock prices influenced by market indices, sector rotation, macro data
+- News and sentiment often drive short-term movements
+- Model must incorporate external signals for real-world accuracy
+
 Reuters: S&P 500 Record High
 
 (Application to stock tracker: market context & benchmark comparison)
