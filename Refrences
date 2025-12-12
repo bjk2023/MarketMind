@@ -1,0 +1,38 @@
+References
+Machine Learning & Deep Learning
+
+Hyperbolic Deep Learning for Foundation Models (Survey)
+https://arxiv.org/abs/2501.04512
+
+Low-Rank Adaptation (LoRA) for Foundation Models: A Survey
+https://arxiv.org/abs/2402.09353
+
+A Comprehensive Survey of Retrieval-Augmented Generation (RAG)
+https://arxiv.org/abs/2312.10997
+
+On the Design Fundamentals of Diffusion Models
+https://www.sciencedirect.com/science/article/pii/S0031320325000200
+
+A Survey of Deep Learning and Foundation Models for Time Series Forecasting
+https://arxiv.org/abs/2401.03512
+
+Financial Markets & Stock Market Context
+
+Reuters — S&P 500 Notches Record High Close
+https://www.reuters.com/markets/us/sp-500-record-high-close-2025-12-11/
+
+Reuters — Wall Street Week Ahead: Investors Await Key Economic Data
+https://www.reuters.com/markets/us/wall-street-week-ahead-investors-await-economic-data-2025-12-12/
+
+Reuters — Citigroup Turnaround Gains Analyst Support
+https://www.reuters.com/business/finance/citigroup-turnaround-jpmorgan-analyst-2025-12-12/
+
+Project Reference
+
+MarketMind (RCOS Project Repository)
+https://github.com/mahirmehta/MarketMind
+
+Optional (Linear Regression Baseline Context)
+
+Stock Price Prediction (Linear Regression Examples & Baselines)
+https://github.com/topics/stock-price-prediction
