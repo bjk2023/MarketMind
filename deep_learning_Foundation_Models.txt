@@ -1,4 +1,11 @@
 link:https://arxiv.org/abs/2507.17787?utm_source
+## Deep Learning & Foundation Models Research
+
+- Reviews hyperbolic models and their usage for hierarchical data
+- Describes low-rank adaptation techniques for efficient fine-tuning
+- Surveys retrieval-augmented generation approaches
+- Explains diffusion models for generative forecasting
+- Covers time series forecasting with transformer-based models
 
 Hyperbolic deep learning provides a framework for representing hierarchical structures efficiently, which is highly relevant to financial market data. Stock markets naturally form hierarchies such as market → sector → industry → firm, as well as relationships between macroeconomic indicators and individual securities. By embedding these relationships in hyperbolic space, a stock tracker can preserve structural similarity more accurately than Euclidean embeddings, improving clustering and similarity searches between stocks.
 
