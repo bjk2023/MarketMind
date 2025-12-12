@@ -1,0 +1,9 @@
+Reuters: S&P 500 Record High
+
+(Application to stock tracker: market context & benchmark comparison)
+
+This article illustrates how macro-level movements influence individual stocks. A stock tracker can use such benchmark data to contextualize asset performance, showing whether gains or losses are market-driven or stock-specific.
+
+By incorporating index-level analytics, the tracker can flag abnormal performance relative to the S&P 500. This improves anomaly detection and helps users avoid misinterpreting broad market rallies as firm-specific success.
+
+The article also highlights valuation risks, reinforcing the importance of combining price tracking with macro indicators. This supports the tracker’s role as an interpretive tool rather than a simple price dashboard.
